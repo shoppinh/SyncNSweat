@@ -10,10 +10,10 @@
 *Holds the current status of the workflow.*
 
 ```yaml
-Phase: VALIDATE # Current workflow phase (ANALYZE, BLUEPRINT, CONSTRUCT, VALIDATE, BLUEPRINT_REVISE)
-Status: COMPLETED # Current status (READY, IN_PROGRESS, BLOCKED_*, NEEDS_*, COMPLETED)
-CurrentTaskID: UNIT_TESTS_SETUP # Identifier for the main task being worked on
-CurrentStep: FRONTEND_TESTS # Identifier for the specific step in the plan being executed
+Phase: BLUEPRINT # Current workflow phase (ANALYZE, BLUEPRINT, CONSTRUCT, VALIDATE, BLUEPRINT_REVISE)
+Status: IN_PROGRESS # Current status (READY, IN_PROGRESS, BLOCKED_*, NEEDS_*, COMPLETED)
+CurrentTaskID: PHASE_1_IMPLEMENTATION # Identifier for the main task being worked on
+CurrentStep: CREATE_IMPLEMENTATION_PLAN # Identifier for the specific step in the plan being executed
 ```
 
 ---
@@ -22,7 +22,307 @@ CurrentStep: FRONTEND_TESTS # Identifier for the specific step in the plan being
 
 *Contains the step-by-step implementation plan generated during the BLUEPRINT phase.*
 
-*Task: Unit Tests Setup*
+*Task: Phase 1 Implementation - Core MVP Build*
+
+### 1. Backend Implementation
+
+#### 1.1 User Authentication
+
+1. Implement User Authentication Endpoints
+   - Verify existing auth endpoints in `backend/app/api/endpoints/auth.py`
+   - Implement or update the following endpoints:
+     - `/api/v1/auth/register` - User registration
+     - `/api/v1/auth/login` - User login with JWT token generation
+     - `/api/v1/auth/refresh-token` - Refresh JWT token
+     - `/api/v1/auth/me` - Get current user info
+   - Implement proper validation and error handling
+
+2. Enhance Security Utilities
+   - Update `backend/app/core/security.py` with additional functions:
+     - Password hashing and verification
+     - JWT token generation and validation
+     - User authentication dependencies
+
+#### 1.2 Profile & Preferences Storage
+
+1. Implement Profile Endpoints
+   - Verify existing profile endpoints in `backend/app/api/endpoints/profiles.py`
+   - Implement or update the following endpoints:
+     - `/api/v1/profiles/me` - Get current user's profile
+     - `/api/v1/profiles/me` (PUT) - Update current user's profile
+     - `/api/v1/profiles/me/preferences` - Get user preferences
+     - `/api/v1/profiles/me/preferences` (PUT) - Update user preferences
+
+2. Implement Data Models and Schemas
+   - Verify existing models in `backend/app/models/`
+   - Ensure the following models are properly implemented:
+     - User model with authentication fields
+     - Profile model with fitness goals, level, available days, etc.
+     - Preferences model with equipment, music, and exercise preferences
+
+#### 1.3 Spotify OAuth Integration
+
+1. Implement Spotify OAuth Flow
+   - Create or update endpoints in `backend/app/api/endpoints/playlists.py`:
+     - `/api/v1/playlists/spotify/auth-url` - Generate Spotify authorization URL
+     - `/api/v1/playlists/spotify/callback` - Handle Spotify OAuth callback
+     - `/api/v1/playlists/spotify/refresh-token` - Refresh Spotify access token
+
+2. Implement Spotify Service
+   - Create or update `backend/app/services/spotify.py`
+   - Implement methods for:
+     - Getting authorization URL
+     - Exchanging code for access token
+     - Refreshing access token
+     - Fetching user's playlists
+     - Searching for playlists by genre/mood
+
+#### 1.4 Exercise Service Integration
+
+1. Implement Exercise API Integration
+   - Create or update `backend/app/services/exercise.py`
+   - Implement methods for:
+     - Fetching exercises by muscle group
+     - Fetching exercises by equipment
+     - Fetching exercise details
+
+2. Implement Exercise Endpoints
+   - Create or update endpoints in `backend/app/api/endpoints/exercises.py`:
+     - `/api/v1/exercises` - Get exercises with filters
+     - `/api/v1/exercises/{id}` - Get exercise details
+     - `/api/v1/exercises/random` - Get random exercises based on criteria
+
+#### 1.5 Workout Scheduling Algorithm
+
+1. Implement Scheduling Service
+   - Create `backend/app/services/scheduler.py`
+   - Implement methods for:
+     - Generating weekly workout split based on user preferences
+     - Assigning focus areas to workout days
+     - Determining workout duration
+
+2. Implement Workout Endpoints
+   - Create or update endpoints in `backend/app/api/endpoints/workouts.py`:
+     - `/api/v1/workouts/schedule` - Generate a new weekly schedule
+     - `/api/v1/workouts/today` - Get today's workout
+     - `/api/v1/workouts/{id}` - Get specific workout
+     - `/api/v1/workouts/{id}` (PUT) - Update workout (mark as completed)
+
+#### 1.6 Exercise Rotation Logic
+
+1. Implement Exercise Selection Service
+   - Create `backend/app/services/exercise_selector.py`
+   - Implement methods for:
+     - Selecting exercises for a workout based on focus
+     - Ensuring variety by tracking recently used exercises
+     - Balancing workout difficulty based on user level
+
+2. Implement Exercise Selection Endpoints
+   - Create or update endpoints in `backend/app/api/endpoints/workouts.py`:
+     - `/api/v1/workouts/{id}/exercises` - Get exercises for a workout
+     - `/api/v1/workouts/{id}/exercises/{exercise_id}/swap` - Swap an exercise
+
+#### 1.7 Music Selection Logic
+
+1. Implement Playlist Selection Service
+   - Create `backend/app/services/playlist_selector.py`
+   - Implement methods for:
+     - Selecting playlists based on workout type and user preferences
+     - Ensuring variety by tracking recently used playlists
+
+2. Implement Playlist Selection Endpoints
+   - Create or update endpoints in `backend/app/api/endpoints/playlists.py`:
+     - `/api/v1/playlists/recommend` - Get playlist recommendations
+     - `/api/v1/playlists/workout/{workout_id}` - Get playlist for a workout
+     - `/api/v1/playlists/workout/{workout_id}/refresh` - Get a new playlist for a workout
+
+### 2. Frontend Implementation
+
+#### 2.1 Authentication Screens
+
+1. Enhance Login Screen
+   - Update `mobile/app/index.tsx` to connect to backend API
+   - Implement form validation
+   - Add loading state and error handling
+   - Store JWT token securely
+
+2. Enhance Signup Screen
+   - Update `mobile/app/signup.tsx` to connect to backend API
+   - Implement form validation
+   - Add loading state and error handling
+
+3. Create Authentication Context
+   - Create `mobile/contexts/AuthContext.tsx`
+   - Implement authentication state management
+   - Provide login, signup, and logout functions
+   - Handle token refresh and persistence
+
+#### 2.2 Onboarding Flow
+
+1. Create Onboarding Screens
+   - Create `mobile/app/onboarding/` directory
+   - Implement the following screens:
+     - Welcome screen (`mobile/app/onboarding/index.tsx`)
+     - Goals selection (`mobile/app/onboarding/goals.tsx`)
+     - Fitness level selection (`mobile/app/onboarding/level.tsx`)
+     - Available days selection (`mobile/app/onboarding/days.tsx`)
+     - Equipment selection (`mobile/app/onboarding/equipment.tsx`)
+     - Music preferences (`mobile/app/onboarding/music.tsx`)
+     - Spotify connection (`mobile/app/onboarding/spotify.tsx`)
+
+2. Implement Onboarding Navigation
+   - Create `mobile/app/onboarding/_layout.tsx`
+   - Implement progress indicator
+   - Add navigation between onboarding steps
+
+3. Create Onboarding Context
+   - Create `mobile/contexts/OnboardingContext.tsx`
+   - Store onboarding progress and data
+   - Submit data to backend on completion
+
+#### 2.3 Dashboard/Home Screen
+
+1. Enhance Home Screen
+   - Update `mobile/app/(tabs)/index.tsx`
+   - Connect to backend API to fetch:
+     - Today's workout
+     - Upcoming workouts
+     - User stats
+   - Implement pull-to-refresh
+   - Add loading states and error handling
+
+2. Create Workout Card Component
+   - Create `mobile/components/WorkoutCard.tsx`
+   - Display workout focus, duration, and exercises
+   - Add start button with navigation to workout screen
+
+3. Create Stats Component
+   - Create `mobile/components/StatsDisplay.tsx`
+   - Display workout stats (completed workouts, total minutes, streak)
+
+#### 2.4 Exercise Detail View
+
+1. Create Exercise Detail Screen
+   - Create `mobile/app/exercise/[id].tsx`
+   - Display exercise details:
+     - Name and description
+     - GIF/image demonstration
+     - Muscle groups worked
+     - Equipment needed
+     - Instructions
+
+2. Create Exercise Card Component
+   - Create `mobile/components/ExerciseCard.tsx`
+   - Display exercise name, sets/reps, and thumbnail
+   - Add tap interaction to view details
+
+#### 2.5 Spotify Integration
+
+1. Implement Spotify Authentication
+   - Create `mobile/services/spotify.ts`
+   - Implement methods for:
+     - Initiating Spotify OAuth flow
+     - Handling OAuth callback
+     - Checking connection status
+
+2. Create Playlist Component
+   - Create `mobile/components/PlaylistCard.tsx`
+   - Display playlist cover, name, and details
+   - Add play button with deep linking to Spotify app
+
+3. Implement Playlist Refresh
+   - Add refresh button to playlist component
+   - Connect to backend API to get a new playlist
+
+#### 2.6 Workout View
+
+1. Enhance Workout Screen
+   - Update `mobile/app/(tabs)/workout.tsx`
+   - Connect to backend API to fetch:
+     - Current workout details
+     - Workout history
+   - Implement tab navigation between upcoming and completed workouts
+
+2. Create Active Workout Screen
+   - Create `mobile/app/workout/active/[id].tsx`
+   - Display current workout exercises
+   - Implement exercise completion tracking
+   - Add rest timer
+   - Display selected playlist
+   - Add workout completion button
+
+#### 2.7 Settings Screen
+
+1. Create Settings Screen
+   - Create `mobile/app/(tabs)/settings.tsx`
+   - Implement the following settings:
+     - Profile information
+     - Workout preferences
+     - Spotify connection status
+     - Logout button
+
+2. Create Profile Edit Screen
+   - Create `mobile/app/settings/profile.tsx`
+   - Allow editing of user profile information
+   - Connect to backend API to update profile
+
+3. Create Preferences Edit Screen
+   - Create `mobile/app/settings/preferences.tsx`
+   - Allow editing of workout and music preferences
+   - Connect to backend API to update preferences
+
+### 3. Integration and Testing
+
+#### 3.1 API Integration
+
+1. Create API Service
+   - Create `mobile/services/api.ts`
+   - Implement base API client with authentication
+   - Add methods for all required API endpoints
+
+2. Implement Error Handling
+   - Create `mobile/services/error.ts`
+   - Implement error handling and formatting
+   - Add retry logic for network failures
+
+#### 3.2 Testing
+
+1. Backend Tests
+   - Write unit tests for all new services
+   - Write API tests for all new endpoints
+   - Ensure test coverage for critical paths
+
+2. Frontend Tests
+   - Write component tests for new components
+   - Write screen tests for new screens
+   - Test authentication flow
+
+#### 3.3 Documentation
+
+1. Update API Documentation
+   - Ensure all endpoints are documented with Swagger/OpenAPI
+   - Add examples and response schemas
+
+2. Update README
+   - Add information about new features
+   - Update setup instructions if needed
+
+### 4. Deployment
+
+1. Prepare for Deployment
+   - Update environment configuration
+   - Ensure all secrets are properly managed
+   - Verify database migrations
+
+2. Deploy Backend
+   - Deploy backend API to development environment
+   - Verify all endpoints are working
+
+3. Build Mobile App
+   - Configure app for development environment
+   - Build development version of the app
+
+*Previous Task: Unit Tests Setup*
 
 ### Frontend Unit Tests Setup
 
@@ -874,9 +1174,9 @@ CurrentStep: FRONTEND_TESTS # Identifier for the specific step in the plan being
          steps:
          - uses: actions/checkout@v2
          - name: Use Node.js
-           uses: actions/setup-node@v2
+           uses: actions/setup-node@v4
            with:
-             node-version: '16.x'
+             node-version: '20.x'
              cache: 'npm'
              cache-dependency-path: SyncSweatApp/package-lock.json
 
@@ -927,7 +1227,7 @@ CurrentStep: FRONTEND_TESTS # Identifier for the specific step in the plan being
          steps:
          - uses: actions/checkout@v2
          - name: Set up Python
-           uses: actions/setup-python@v2
+           uses: actions/setup-python@v5
            with:
              python-version: '3.9'
              cache: 'pip'
@@ -1372,6 +1672,18 @@ RULE_ERR_HANDLE_GENERAL_01:
 [2023-11-16 13:30:00] Verified tests are running correctly.
 [2023-11-16 13:45:00] State.Phase changed to VALIDATE.
 [2023-11-16 14:00:00] State.Status changed to COMPLETED.
+[2023-11-17 09:00:00] User task: Prepare for Phase 1 implementation.
+[2023-11-17 09:00:15] State.Phase changed to ANALYZE.
+[2023-11-17 09:00:30] State.Status changed to IN_PROGRESS.
+[2023-11-17 09:00:45] CurrentTaskID changed to PHASE_1_IMPLEMENTATION.
+[2023-11-17 09:01:00] CurrentStep changed to ANALYZE_REQUIREMENTS.
+[2023-11-17 09:05:00] Analyzing Phase 1 requirements from project overview.
+[2023-11-17 09:30:00] Completed analysis of Phase 1 requirements.
+[2023-11-17 09:30:15] State.Phase changed to BLUEPRINT.
+[2023-11-17 09:30:30] CurrentStep changed to CREATE_IMPLEMENTATION_PLAN.
+[2023-11-17 09:35:00] Creating detailed implementation plan for Phase 1.
+[2023-11-17 10:30:00] Completed detailed implementation plan for Phase 1.
+[2023-11-17 10:35:00] Ready to begin implementation of Phase 1 tasks.
 [2023-11-16 09:01:00] Reading project structure and existing test files.
 [2023-11-16 09:05:00] Completed analysis of project structure and existing test files.
 [2023-11-16 09:05:15] State.Phase changed to BLUEPRINT.
