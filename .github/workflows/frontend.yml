@@ -4,11 +4,11 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'SyncSweatApp/**'
+      - 'mobile/**'
   pull_request:
     branches: [ main ]
     paths:
-      - 'SyncSweatApp/**'
+      - 'mobile/**'
 
 jobs:
   build:
@@ -21,19 +21,19 @@ jobs:
       with:
         node-version: '20.x'
         cache: 'npm'
-        cache-dependency-path: SyncSweatApp/package-lock.json
+        cache-dependency-path: mobile/package-lock.json
 
     - name: Install dependencies
-      run: cd SyncSweatApp && npm install
+      run: cd mobile && npm install
 
     - name: Install Expo CLI
       run: npm install -g expo-cli
 
     - name: Lint
-      run: cd SyncSweatApp && npm run lint
+      run: cd mobile && npm run lint
 
     - name: TypeScript check
-      run: cd SyncSweatApp && npx tsc --noEmit
+      run: cd mobile && npx tsc --noEmit
 
     - name: Run tests
-      run: cd SyncSweatApp && npm test
+      run: cd mobile && npm test

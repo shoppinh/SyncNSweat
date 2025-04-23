@@ -1,4 +1,4 @@
-# Sync & Sweat Mobile App
+# Sync & Sweat Mobile App - Updated
 
 This is the mobile app for Sync & Sweat, built with [Expo](https://expo.dev) and React Native.
 
