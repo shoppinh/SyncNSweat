@@ -1,0 +1,40 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`<HelloWave /> renders correctly 1`] = `
+<View
+  style={
+    {
+      "transform": [
+        {
+          "rotate": "0deg",
+        },
+      ],
+    }
+  }
+>
+  <Text
+    style={
+      [
+        {
+          "color": "#000000",
+        },
+        {
+          "fontSize": 16,
+          "lineHeight": 24,
+        },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        {
+          "fontSize": 28,
+          "lineHeight": 32,
+          "marginTop": -6,
+        },
+      ]
+    }
+  >
+    👋
+  </Text>
+</View>
+`;
