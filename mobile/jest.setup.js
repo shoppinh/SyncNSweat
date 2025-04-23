@@ -1,3 +1,7 @@
+
+
+import { jest } from '@jest/globals';
+
 // Mock expo modules that might cause issues in tests
 jest.mock('expo-font');
 jest.mock('expo-asset');
@@ -65,3 +69,4 @@ jest.mock('react-native', () => {
   reactNative.NativeModules.StatusBarManager = { getHeight: jest.fn() };
   return reactNative;
 });
+

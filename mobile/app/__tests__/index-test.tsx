@@ -2,6 +2,7 @@ import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import LoginScreen from '../index';
 

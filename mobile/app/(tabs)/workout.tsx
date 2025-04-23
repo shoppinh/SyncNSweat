@@ -7,6 +7,22 @@ import {
   View,
 } from "react-native";
 
+interface WorkoutItem {
+  date: string;
+  focus: string;
+  duration: number;
+  completed: boolean;
+  exercises: Exercise[];
+}
+
+interface Exercise {
+  id: string;
+  name: string;
+  sets: number;
+  reps: string;
+  completed: boolean;
+}
+
 const WorkoutScreen = () => {
   // Mock data for workouts
   const [workouts, setWorkouts] = useState([
@@ -91,7 +107,7 @@ const WorkoutScreen = () => {
   const upcomingWorkouts = workouts.filter((workout) => !workout.completed);
   const completedWorkouts = workouts.filter((workout) => workout.completed);
 
-  const renderWorkoutItem = ({ item }) => (
+  const renderWorkoutItem = ({ item }: { item: WorkoutItem }) => (
     <TouchableOpacity style={styles.workoutCard}>
       <View style={styles.workoutHeader}>
         <Text style={styles.workoutDate}>

@@ -2,7 +2,7 @@ import { render } from "@testing-library/react-native";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import React from "react";
-
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import RootLayout from "../_layout";
 
 // Mock the dependencies

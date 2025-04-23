@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { HapticTab } from '../HapticTab';
 

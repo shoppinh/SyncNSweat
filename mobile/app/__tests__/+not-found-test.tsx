@@ -1,3 +1,4 @@
+import { describe, expect, it, jest } from "@jest/globals";
 import { render } from "@testing-library/react-native";
 import React from "react";
 
@@ -5,7 +6,7 @@ import NotFoundScreen from "../+not-found";
 
 // Mock expo-router
 jest.mock("expo-router", () => ({
-  Link: ({ href, style, children, onPress }) => (
+  Link: ({ href, style, children, onPress }: any) => (
     <div href={href} style={style} onPress={onPress}>
       {children}
     </div>

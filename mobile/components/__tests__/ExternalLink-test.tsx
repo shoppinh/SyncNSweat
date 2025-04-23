@@ -1,7 +1,8 @@
-import * as React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { Platform } from 'react-native';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { fireEvent, render } from '@testing-library/react-native';
 import { openBrowserAsync } from 'expo-web-browser';
+import * as React from 'react';
+import { Platform } from 'react-native';
 
 import { ExternalLink } from '../ExternalLink';
 

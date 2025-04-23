@@ -1,5 +1,6 @@
-import * as React from 'react';
+import { describe, expect, it, jest } from '@jest/globals';
 import { render } from '@testing-library/react-native';
+import * as React from 'react';
 import renderer from 'react-test-renderer';
 
 import { IconSymbol } from '../ui/IconSymbol';
@@ -22,7 +23,7 @@ describe('<IconSymbol />', () => {
         name="house.fill" 
         color="#000000" 
         size={32} 
-        testID="icon-symbol"
+        testId="icon-symbol"
       />
     );
     
@@ -38,7 +39,7 @@ describe('<IconSymbol />', () => {
         name="house.fill" 
         color="#000000" 
         style={customStyle} 
-        testID="icon-symbol"
+        testId="icon-symbol"
       />
     );
     
@@ -51,7 +52,7 @@ describe('<IconSymbol />', () => {
       <IconSymbol 
         name="house.fill" 
         color="#000000" 
-        testID="icon-symbol"
+        testId="icon-symbol"
       />
     );
     
