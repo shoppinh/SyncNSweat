@@ -1,4 +1,4 @@
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from typing import Optional
 import os
 from dotenv import load_dotenv
@@ -12,11 +12,11 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "development_secret_key")
     DATABASE_URI: str = os.getenv("DATABASE_URI", "postgresql://postgres:postgres@localhost/syncnsweat")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
-    
+
     # Spotify API settings
     SPOTIFY_CLIENT_ID: Optional[str] = os.getenv("SPOTIFY_CLIENT_ID")
     SPOTIFY_CLIENT_SECRET: Optional[str] = os.getenv("SPOTIFY_CLIENT_SECRET")
-    
+
     # Exercise API settings
     EXERCISE_API_KEY: Optional[str] = os.getenv("EXERCISE_API_KEY")
     EXERCISE_API_HOST: Optional[str] = os.getenv("EXERCISE_API_HOST")
