@@ -1,0 +1,39 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'SyncSweatApp/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'SyncSweatApp/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16.x'
+        cache: 'npm'
+        cache-dependency-path: SyncSweatApp/package-lock.json
+
+    - name: Install dependencies
+      run: cd SyncSweatApp && npm install
+
+    - name: Install Expo CLI
+      run: npm install -g expo-cli
+
+    - name: Lint
+      run: cd SyncSweatApp && npm run lint
+
+    - name: TypeScript check
+      run: cd SyncSweatApp && npx tsc --noEmit
+
+    - name: Run tests
+      run: cd SyncSweatApp && npm test
