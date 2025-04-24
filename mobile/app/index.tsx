@@ -1,15 +1,33 @@
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
 
-  const handleLogin = () => {
+  // If already authenticated, redirect to main app
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Use as any to bypass type checking for now
+      router.replace('/(tabs)' as any);
+    }
+  }, [isAuthenticated]);
+
+  // Show error alert if there's an error
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Error', error, [
+        { text: 'OK', onPress: clearError }
+      ]);
+    }
+  }, [error, clearError]);
+
+  const handleLogin = async () => {
     if (email && password) {
-      // Navigate to the main app
-      router.replace('/(tabs)/');
+      await login(email, password);
     } else {
       Alert.alert('Error', 'Please enter email and password');
     }
@@ -19,7 +37,7 @@ const LoginScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Sync & Sweat</Text>
       <Text style={styles.subtitle}>Login to your account</Text>
-      
+
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -37,12 +55,20 @@ const LoginScreen = () => {
           secureTextEntry
         />
       </View>
-      
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Login</Text>
+
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleLogin}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.buttonText}>Login</Text>
+        )}
       </TouchableOpacity>
-      
-      <TouchableOpacity onPress={() => router.push('/signup')}>
+
+      <TouchableOpacity onPress={() => router.push('signup' as any)}>
         <Text style={styles.linkText}>Don't have an account? Sign up</Text>
       </TouchableOpacity>
     </View>
