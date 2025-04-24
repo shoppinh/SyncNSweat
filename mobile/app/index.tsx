@@ -9,7 +9,7 @@ const LoginScreen = () => {
   const handleLogin = () => {
     if (email && password) {
       // Navigate to the main app
-      router.replace('/(tabs)/index');
+      router.replace('/(tabs)/');
     } else {
       Alert.alert('Error', 'Please enter email and password');
     }

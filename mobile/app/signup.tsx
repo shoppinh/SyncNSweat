@@ -20,7 +20,7 @@ const SignupScreen = () => {
     }
     
     // Navigate to the main app
-    router.replace('/(tabs)/index');
+    router.replace("/");
   };
 
   return (

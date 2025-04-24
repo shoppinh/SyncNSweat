@@ -207,3 +207,73 @@ Tasks:
 - Analyze user behaviour and feedback (analytics tools like Amplitude, Mixpanel).
 - Plan and implement further features based on user needs and business goals.
 - Regularly review and update API integrations (Spotify, Exercise API).
+
+## Phase 5: AI Integration & Enhancement (Estimate: 4-6 Weeks)
+
+Goal: Integrate Google Gemini 2.0 for enhanced workout planning while maintaining reliable exercise content delivery through ExerciseDB.
+
+Backend Tasks:
+- Implement GeminiService:
+  - Set up Google Gemini 2.0 API integration
+  - Create prompt engineering for workout schedule generation
+  - Develop playlist suggestion system
+  - Implement error handling and fallback mechanisms
+  - Add rate limiting and response caching
+
+- Enhance WorkoutPlannerService:
+  - Create hybrid system combining Gemini's suggestions with ExerciseDB content
+  - Implement intelligent exercise selection based on Gemini's high-level plans
+  - Develop database synchronization for AI-generated schedules
+  - Add fallback templates for offline/failure scenarios
+  - Create validation layer for AI-generated content
+
+- Database Updates:
+  - Add tables for AI-generated workout plans
+  - Create tracking system for AI suggestions effectiveness
+  - Implement caching system for common AI responses
+  - Add fields for user feedback on AI-generated content
+
+Frontend Tasks:
+- Update Schedule Generation UI:
+  - Add loading states for AI processing
+  - Implement preview/confirmation flow for AI-generated schedules
+  - Create UI for schedule regeneration requests
+  - Add feedback mechanism for AI-generated content
+
+- Enhance Workout View:
+  - Display AI-generated workout context and reasoning
+  - Add UI elements for alternative exercise suggestions
+  - Implement smooth transitions between AI suggestions and ExerciseDB content
+
+Testing:
+- Unit tests for AI integration components
+- Integration tests for hybrid workout generation system
+- Performance testing for AI response times
+- Validation tests for AI-generated content
+- Error handling and fallback scenario testing
+
+Documentation:
+- Update API documentation with AI endpoints
+- Document prompt engineering patterns
+- Create maintenance guide for AI components
+- Update user guide with AI-powered features
+
+Monitoring & Analytics:
+- Implement AI response time tracking
+- Add usage metrics for AI features
+- Create dashboard for AI suggestion quality
+- Set up alerting for AI service issues
+
+Success Metrics:
+- AI response success rate
+- User satisfaction with AI-generated schedules
+- System performance with AI integration
+- Cost per AI-generated schedule
+- User engagement with AI-suggested workouts
+
+Considerations:
+- Monitor AI API costs and implement optimization strategies
+- Ensure GDPR compliance with AI data processing
+- Maintain offline functionality when AI services are unavailable
+- Regular review and refinement of AI prompts
+- Balance between AI creativity and exercise safety/effectiveness
