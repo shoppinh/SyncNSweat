@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from app.schemas.exercise import WorkoutExerciseCreate, WorkoutExerciseResponse
 
@@ -26,3 +26,12 @@ class WorkoutResponse(WorkoutBase):
 
     class Config:
         orm_mode = True
+
+class ScheduleRequest(BaseModel):
+    """Request model for generating a workout schedule."""
+    regenerate: Optional[bool] = False
+
+class ScheduleResponse(BaseModel):
+    """Response model for a generated workout schedule."""
+    workouts: List[WorkoutResponse]
+    message: str

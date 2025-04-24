@@ -8,7 +8,7 @@ from app.models.profile import Profile
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 from app.core.security import get_password_hash, verify_password
 from app.api.deps import get_current_user
-
+from app.api.endpoints.auth import register
 router = APIRouter()
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -16,32 +16,7 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     """
     Create a new user.
     """
-    # Check if user with this email already exists
-    db_user = db.query(User).filter(User.email == user_in.email).first()
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    # Create new user
-    hashed_password = get_password_hash(user_in.password)
-    db_user = User(
-        email=user_in.email,
-        hashed_password=hashed_password,
-        is_active=True
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    
-    # Create profile for user if name is provided
-    if user_in.name:
-        profile = Profile(user_id=db_user.id, name=user_in.name)
-        db.add(profile)
-        db.commit()
-    
-    return db_user
+    return register(user_in, db)
 
 @router.get("/me", response_model=UserResponse)
 def read_user_me(current_user: User = Depends(get_current_user)):
