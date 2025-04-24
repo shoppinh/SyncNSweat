@@ -8,7 +8,7 @@ from app.models.profile import Profile
 from app.models.preferences import Preferences
 from app.schemas.profile import ProfileCreate, ProfileResponse, ProfileUpdate
 from app.schemas.preferences import PreferencesCreate, PreferencesResponse, PreferencesUpdate
-from app.api.deps import get_current_user
+from app.core.security import get_current_user
 
 router = APIRouter()
 

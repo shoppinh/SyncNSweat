@@ -8,11 +8,10 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.profile import Profile
 from app.models.preferences import Preferences
-from app.core.security import create_access_token, verify_password, get_password_hash
+from app.core.security import create_access_token, verify_password, get_password_hash, get_current_user
 from app.core.config import settings
 from app.schemas.token import Token, TokenPayload
 from app.schemas.user import UserCreate, UserResponse
-from app.api.deps import get_current_user
 from app.services.spotify import SpotifyService
 
 router = APIRouter()

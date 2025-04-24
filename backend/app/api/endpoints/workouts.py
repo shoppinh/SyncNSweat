@@ -10,7 +10,7 @@ from app.models.preferences import Preferences
 from app.models.workout import Workout, WorkoutExercise
 from app.schemas.workout import WorkoutCreate, WorkoutResponse, WorkoutUpdate, ScheduleResponse, ScheduleRequest
 from app.schemas.exercise import WorkoutExerciseCreate, WorkoutExerciseResponse, WorkoutExerciseUpdate
-from app.api.deps import get_current_user
+from app.core.security import get_current_user
 from app.services.scheduler import SchedulerService
 from app.services.exercise_selector import ExerciseSelectorService
 

@@ -9,7 +9,7 @@ from app.models.preferences import Preferences
 from app.models.workout import Workout
 from app.services.spotify import SpotifyService
 from app.services.playlist_selector import PlaylistSelectorService
-from app.api.deps import get_current_user
+from app.core.security import get_current_user
 
 router = APIRouter()
 
