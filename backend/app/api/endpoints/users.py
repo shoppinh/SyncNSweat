@@ -6,8 +6,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.profile import Profile
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
-from app.core.security import get_password_hash, verify_password
-from app.api.deps import get_current_user
+from app.core.security import get_password_hash, get_current_user
 from app.api.endpoints.auth import register
 router = APIRouter()
 
@@ -28,12 +27,15 @@ def read_user_me(current_user: User = Depends(get_current_user)):
 @router.put("/me", response_model=UserResponse)
 def update_user_me(
     user_in: UserUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = None,
     db: Session = Depends(get_db)
 ):
     """
     Update current user.
     """
+    if current_user is None:
+        current_user = Depends(get_current_user)
+        
     if user_in.password:
         hashed_password = get_password_hash(user_in.password)
         current_user.hashed_password = hashed_password

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timedelta
@@ -12,7 +12,14 @@ from app.schemas.workout import WorkoutCreate, WorkoutResponse, WorkoutUpdate, S
 from app.schemas.exercise import WorkoutExerciseCreate, WorkoutExerciseResponse, WorkoutExerciseUpdate
 from app.api.deps import get_current_user
 from app.services.scheduler import SchedulerService
-from app.services.playlist_selector import PlaylistSelectorService
+from app.services.exercise_selector import ExerciseSelectorService
+
+# Define constants for error messages
+WORKOUT_NOT_FOUND = "Workout not found"
+EXERCISE_NOT_FOUND = "Exercise not found"
+PROFILE_NOT_FOUND = "Profile not found"
+PREFERENCES_NOT_FOUND = "Preferences not found"
+NO_WORKOUT_TODAY = "No workout scheduled for today"
 
 router = APIRouter()
 
@@ -49,7 +56,7 @@ def create_workout(
     """
     db_workout = Workout(
         user_id=current_user.id,
-        **workout_in.dict(exclude={"exercises"})
+        **workout_in.model_dump(exclude={"exercises"})
     )
     db.add(db_workout)
     db.commit()
@@ -61,7 +68,7 @@ def create_workout(
             db_exercise = WorkoutExercise(
                 workout_id=db_workout.id,
                 order=i + 1,
-                **exercise_in.dict()
+                **exercise_in.model_dump()
             )
             db.add(db_exercise)
 
@@ -114,7 +121,7 @@ def update_workout(
         )
 
     # Update workout fields
-    for field, value in workout_in.dict(exclude_unset=True, exclude={"exercises"}).items():
+    for field, value in workout_in.model_dump(exclude_unset=True, exclude={"exercises"}).items():
         setattr(workout, field, value)
 
     db.add(workout)
@@ -208,7 +215,7 @@ def add_workout_exercise(
     db_exercise = WorkoutExercise(
         workout_id=workout_id,
         order=next_order,
-        **exercise_in.dict()
+        **exercise_in.model_dump()
     )
     db.add(db_exercise)
     db.commit()
@@ -252,7 +259,7 @@ def update_workout_exercise(
         )
 
     # Update exercise fields
-    for field, value in exercise_in.dict(exclude_unset=True).items():
+    for field, value in exercise_in.model_dump(exclude_unset=True).items():
         setattr(exercise, field, value)
 
     db.add(exercise)
@@ -415,3 +422,89 @@ def get_today_workout(
         )
 
     return workout
+
+@router.post("/{workout_id}/exercises/{exercise_id}/swap", response_model=WorkoutExerciseResponse)
+def swap_workout_exercise(
+    workout_id: int,
+    exercise_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Swap an exercise in a workout with a similar one.
+    """
+    # Check if workout exists and belongs to user
+    workout = db.query(Workout).filter(
+        Workout.id == workout_id,
+        Workout.user_id == current_user.id
+    ).first()
+
+    if not workout:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workout not found"
+        )
+
+    # Get the exercise
+    exercise = db.query(WorkoutExercise).filter(
+        WorkoutExercise.id == exercise_id,
+        WorkoutExercise.workout_id == workout_id
+    ).first()
+
+    if not exercise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exercise not found"
+        )
+
+    # Get user profile and preferences
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found"
+        )
+
+    preferences = db.query(Preferences).filter(Preferences.profile_id == profile.id).first()
+    if not preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Preferences not found"
+        )
+
+    # Get all exercises in the workout to avoid duplicates
+    workout_exercises = db.query(WorkoutExercise).filter(
+        WorkoutExercise.workout_id == workout_id
+    ).all()
+
+    recently_used_exercises = [ex.exercise_id for ex in workout_exercises if ex.id != exercise_id]
+
+    # Use the exercise selector service to find a replacement
+    exercise_selector = ExerciseSelectorService()
+    new_exercise_data = exercise_selector.swap_exercise(
+        exercise_id=exercise.exercise_id,
+        muscle_group=exercise.muscle_group,
+        equipment=exercise.equipment,
+        fitness_level=profile.fitness_level.value,
+        available_equipment=preferences.available_equipment,
+        recently_used_exercises=recently_used_exercises
+    )
+
+    # Update the exercise with the new data
+    exercise.exercise_id = new_exercise_data["exercise_id"]
+    exercise.name = new_exercise_data["name"]
+    exercise.description = new_exercise_data["description"]
+    exercise.muscle_group = new_exercise_data["muscle_group"]
+    exercise.equipment = new_exercise_data["equipment"]
+    exercise.sets = new_exercise_data["sets"]
+    exercise.reps = new_exercise_data["reps"]
+    exercise.rest_seconds = new_exercise_data["rest_seconds"]
+    exercise.completed_sets = 0
+    exercise.weights_used = []
+
+    db.add(exercise)
+    db.commit()
+    db.refresh(exercise)
+
+    return exercise
+
