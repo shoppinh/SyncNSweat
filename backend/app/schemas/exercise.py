@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Union
 
 class WorkoutExerciseBase(BaseModel):
@@ -25,5 +25,4 @@ class WorkoutExerciseResponse(WorkoutExerciseBase):
     workout_id: int
     order: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

@@ -26,6 +26,7 @@ def read_profile_me(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found"
         )
+        
     return profile
 
 @router.post("/", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)

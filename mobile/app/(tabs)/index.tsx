@@ -1,3 +1,4 @@
+import { useAuth } from '@/contexts/AuthContext';
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 
@@ -8,7 +9,9 @@ const HomeScreen = () => {
     { id: '2', date: 'Tomorrow', focus: 'Lower Body', duration: 60 },
     { id: '3', date: 'Friday', focus: 'Core & Cardio', duration: 30 },
   ];
-
+    const result = useAuth();
+    console.log("🚀 ~ HomeScreen ~ result:", result)
+  
   // Mock data for workout stats
   const stats = {
     workoutsCompleted: 12,

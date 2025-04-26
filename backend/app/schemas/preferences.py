@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
+from pydantic.alias_generators import to_camel
 
 class PreferencesBase(BaseModel):
     available_equipment: Optional[List[str]] = None
@@ -9,6 +10,8 @@ class PreferencesBase(BaseModel):
     exercise_types: Optional[List[str]] = None
     spotify_connected: Optional[bool] = None
     spotify_data: Optional[Dict[str, Any]] = None
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class PreferencesCreate(PreferencesBase):
     pass
@@ -20,5 +23,4 @@ class PreferencesResponse(PreferencesBase):
     id: int
     profile_id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

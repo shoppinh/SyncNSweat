@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from app.schemas.exercise import WorkoutExerciseCreate, WorkoutExerciseResponse
@@ -24,8 +24,7 @@ class WorkoutResponse(WorkoutBase):
     created_at: datetime
     exercises: List[WorkoutExerciseResponse] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ScheduleRequest(BaseModel):
     """Request model for generating a workout schedule."""
