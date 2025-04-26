@@ -14,6 +14,10 @@ class WorkoutBase(BaseModel):
 class WorkoutCreate(WorkoutBase):
     date: datetime
     exercises: Optional[List[WorkoutExerciseCreate]] = None
+    
+class WorkoutSuggest(WorkoutBase):
+    fitness_level: Optional[str] = None
+    available_equipment: Optional[List[str]] = None
 
 class WorkoutUpdate(WorkoutBase):
     pass

@@ -8,7 +8,7 @@ from app.models.user import User
 from app.models.profile import Profile
 from app.models.preferences import Preferences
 from app.models.workout import Workout, WorkoutExercise
-from app.schemas.workout import WorkoutCreate, WorkoutResponse, WorkoutUpdate, ScheduleResponse, ScheduleRequest
+from app.schemas.workout import WorkoutBase, WorkoutCreate, WorkoutResponse, WorkoutSuggest, WorkoutUpdate, ScheduleResponse, ScheduleRequest
 from app.schemas.exercise import WorkoutExerciseCreate, WorkoutExerciseResponse, WorkoutExerciseUpdate
 from app.core.security import get_current_user
 from app.services.scheduler import SchedulerService
@@ -44,6 +44,45 @@ def read_workouts(
 
     workouts = query.order_by(Workout.date.desc()).offset(skip).limit(limit).all()
     return workouts
+
+@router.post("/suggest-workout-today", response_model=WorkoutResponse, status_code=status.HTTP_201_CREATED)
+def create_random_workout(
+    suggest_in: WorkoutSuggest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a random workout for the current user.
+    """
+    db_workout = Workout(user_id=current_user.id, focus=suggest_in.focus, duration_minutes=suggest_in.duration_minutes, date=datetime.now())
+    db.add(db_workout)
+    db.flush()
+    
+    exercise_selector = ExerciseSelectorService()
+    
+    workout_exercises = exercise_selector.select_exercises_for_workout(
+        focus=suggest_in.focus,
+        fitness_level=suggest_in.fitness_level,
+        available_equipment=suggest_in.available_equipment,
+        workout_duration_minutes=suggest_in.duration_minutes
+    )
+    
+    exercises_to_add = [
+        WorkoutExercise(
+            workout_id=db_workout.id,
+            **exercise_data
+        )
+        for _, exercise_data in enumerate(workout_exercises)
+    ]
+    db.bulk_save_objects(exercises_to_add)
+    db.flush()
+    
+    db_workout.exercises = db.query(WorkoutExercise).filter(WorkoutExercise.workout_id == db_workout.id).order_by(WorkoutExercise.order).all()
+
+    
+    db.commit()
+    
+    return db_workout
 
 @router.post("/", response_model=WorkoutResponse, status_code=status.HTTP_201_CREATED)
 def create_workout(

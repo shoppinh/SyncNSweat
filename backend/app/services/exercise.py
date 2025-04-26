@@ -35,6 +35,7 @@ class ExerciseService:
     def get_exercises_by_muscle(self, muscle: str) -> List[Dict[str, Any]]:
         """
         Get exercises by target muscle.
+        Accepted params: ["abductors","abs","adductors","biceps","calves","cardiovascular system","delts","forearms","glutes","hamstrings","lats","levator scapulae","pectorals","quads","serratus anterior","spine","traps","triceps","upper back"]
         """
         headers = {
             "X-RapidAPI-Key": self.api_key,
@@ -99,7 +100,7 @@ class ExerciseService:
                 ]
                 # Take up to 2 exercises per muscle group
                 exercises.extend(filtered_exercises[:2])
-            except Exception as e:
+            except Exception:
                 # If API call fails, continue with other muscle groups
                 continue
         

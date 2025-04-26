@@ -28,12 +28,16 @@ class WorkoutExercise(Base):
     exercise_id = Column(String)  # ID from external exercise API
     name = Column(String)
     description = Column(Text, nullable=True)
-    muscle_group = Column(String)
+    body_part = Column(String, nullable=True)
+    target = Column(String)
+    secondary_muscles = Column(ARRAY(String), nullable=True)
     equipment = Column(String, nullable=True)
     sets = Column(Integer)
     reps = Column(String)  # Could be "8-12" or just "10"
     rest_seconds = Column(Integer)
     order = Column(Integer)  # Order in the workout
+    gif_url = Column(String, nullable=True)
+    instructions = Column(ARRAY(String), nullable=True)
 
     # For tracking progress
     completed_sets = Column(Integer, default=0)

@@ -43,6 +43,7 @@ class ExerciseSelectorService:
         for muscle in muscle_groups:
             try:
                 muscle_exercises = self.exercise_service.get_exercises_by_muscle(muscle)
+                muscle_exercises = muscle_exercises[:2]  # Limit to 2 exercises per muscle group
                 # Filter by available equipment
                 filtered_exercises = [
                     ex for ex in muscle_exercises
@@ -104,13 +105,16 @@ class ExerciseSelectorService:
             workout_exercises.append({
                 "exercise_id": ex.get("id"),
                 "name": ex.get("name"),
-                "description": ex.get("instructions", []),
-                "muscle_group": ex.get("target"),
+                "instructions": ex.get("instructions", []),
+                "target": ex.get("target"),
+                "body_part": ex.get("bodyPart"),
+                "secondary_muscles": ex.get("secondaryMuscles"),
+                "gif_url": ex.get("gifUrl"),
                 "equipment": ex.get("equipment"),
                 "sets": sets,
                 "reps": reps,
                 "rest_seconds": rest_seconds,
-                "order": i + 1
+                "order": i + 1,
             })
         
         return workout_exercises
@@ -248,21 +252,22 @@ class ExerciseSelectorService:
         Returns:
             A list of muscle groups
         """
+        
         focus_map = {
-            "Full Body": ["chest", "back", "quads", "hamstrings", "shoulders", "biceps", "triceps", "abs"],
-            "Upper Body": ["chest", "back", "shoulders", "biceps", "triceps"],
-            "Lower Body": ["quads", "hamstrings", "glutes", "calves"],
-            "Push": ["chest", "shoulders", "triceps"],
-            "Pull": ["back", "biceps", "forearms"],
-            "Legs": ["quads", "hamstrings", "glutes", "calves"],
-            "Chest": ["chest", "triceps"],
-            "Back": ["back", "biceps"],
-            "Shoulders": ["shoulders", "traps"],
-            "Arms": ["biceps", "triceps", "forearms"],
-            "Core": ["abs", "lower_back"]
+            "Full Body": ["abductors", "abs", "adductors", "biceps", "calves", "cardiovascular system", "delts", "forearms", "glutes", "hamstrings", "lats", "levator scapulae", "pectorals", "quads", "serratus anterior", "spine", "traps", "triceps", "upper back"],
+            "Upper Body": ["biceps", "delts", "forearms", "lats", "levator scapulae", "pectorals", "serratus anterior", "traps", "triceps", "upper back"],
+            "Lower Body": ["abductors", "adductors", "calves", "glutes", "hamstrings", "quads"],
+            "Push": ["delts", "pectorals", "serratus anterior", "triceps"],
+            "Pull": ["biceps", "forearms", "lats", "upper back"],
+            "Legs": ["abductors", "adductors", "calves", "glutes", "hamstrings", "quads"],
+            "Chest": ["pectorals", "serratus anterior"],
+            "Back": ["lats", "levator scapulae", "upper back"],
+            "Shoulders": ["delts", "traps"],
+            "Arms": ["biceps", "forearms", "triceps"],
+            "Core": ["abs", "spine"]
         }
         
-        return focus_map.get(focus, ["chest", "back", "quads"])  # Default to some major muscle groups
+        return focus_map.get(focus, ["pectorals", "serratus anterior"])  # Default to some major muscle groups
     
     def _get_similar_muscle_groups(self, muscle_group: str) -> List[str]:
         """

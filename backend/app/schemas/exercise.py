@@ -4,8 +4,10 @@ from typing import List, Optional, Union
 class WorkoutExerciseBase(BaseModel):
     exercise_id: str
     name: str
-    description: Optional[str] = None
-    muscle_group: str
+    instructions: Optional[List[str]] = None
+    target: str
+    secondary_muscles: Optional[List[str]] = None
+    gif_url: Optional[str] = None
     equipment: Optional[str] = None
     sets: int
     reps: str
