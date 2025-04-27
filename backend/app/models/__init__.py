@@ -11,5 +11,6 @@ __all__ = [
     "FitnessLevel",
     "Preferences",
     "Workout",
-    "WorkoutExercise"
+    "WorkoutExercise",
+    "Exercise",
 ]

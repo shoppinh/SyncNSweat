@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
 from typing import List
 from datetime import datetime, timedelta
 
@@ -7,7 +8,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.profile import Profile
 from app.models.preferences import Preferences
-from app.models.workout import Workout, WorkoutExercise
+from app.models.workout import Exercise, Workout, WorkoutExercise
 from app.schemas.workout import WorkoutBase, WorkoutCreate, WorkoutResponse, WorkoutSuggest, WorkoutUpdate, ScheduleResponse, ScheduleRequest
 from app.schemas.exercise import WorkoutExerciseCreate, WorkoutExerciseResponse, WorkoutExerciseUpdate
 from app.core.security import get_current_user
@@ -35,7 +36,7 @@ def read_workouts(
     """
     Get all workouts for the current user.
     """
-    query = db.query(Workout).filter(Workout.user_id == current_user.id)
+    query = db.query(Workout).options(selectinload(Workout.workout_exercises).selectinload(WorkoutExercise.exercise)).filter(Workout.user_id == current_user.id)
 
     if start_date:
         query = query.filter(Workout.date >= start_date)
@@ -53,12 +54,20 @@ def create_random_workout(
 ):
     """
     Create a random workout for the current user.
+
+    - **available_equipment**: List of equipment options you can use for your workout.  
+      Example:  
+      `["assisted", "band", "barbell", "body weight", "bosu ball", "cable", "dumbbell", "elliptical machine", "ez barbell", "hammer", "kettlebell", "leverage machine", "medicine ball", "olympic barbell", "resistance band", "roller", "rope", "skierg machine", "sled machine", "smith machine", "stability ball", "stationary bike", "stepmill machine", "tire", "trap bar", "upper body ergometer", "weighted", "wheel roller"]`
+
+    - **focus**: The main muscle group or goal for the workout.  
+      Example:  
+      `["abductors", "abs", "adductors", "biceps", "calves", "cardiovascular system", "delts", "forearms", "glutes", "hamstrings", "lats", "levator scapulae", "pectorals", "quads", "serratus anterior", "spine", "traps", "triceps", "upper back"]`
     """
     db_workout = Workout(user_id=current_user.id, focus=suggest_in.focus, duration_minutes=suggest_in.duration_minutes, date=datetime.now())
     db.add(db_workout)
     db.flush()
     
-    exercise_selector = ExerciseSelectorService()
+    exercise_selector = ExerciseSelectorService(db)
     
     workout_exercises = exercise_selector.select_exercises_for_workout(
         focus=suggest_in.focus,
@@ -75,12 +84,10 @@ def create_random_workout(
         for _, exercise_data in enumerate(workout_exercises)
     ]
     db.bulk_save_objects(exercises_to_add)
-    db.flush()
-    
-    db_workout.exercises = db.query(WorkoutExercise).filter(WorkoutExercise.workout_id == db_workout.id).order_by(WorkoutExercise.order).all()
-
-    
+    db_workout.exercises = db.query(WorkoutExercise).filter(WorkoutExercise.workout_id == db_workout.id).order_by(WorkoutExercise.order)
     db.commit()
+    db.refresh(db_workout)
+
     
     return db_workout
 
@@ -133,7 +140,7 @@ def read_workout(
     if not workout:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout not found"
+            detail=WORKOUT_NOT_FOUND
         )
 
     return workout
@@ -156,7 +163,7 @@ def update_workout(
     if not workout:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout not found"
+            detail=WORKOUT_NOT_FOUND
         )
 
     # Update workout fields
@@ -185,7 +192,7 @@ def delete_workout(
     if not workout:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout not found"
+            detail=WORKOUT_NOT_FOUND
         )
 
     db.delete(workout)
@@ -210,7 +217,7 @@ def read_workout_exercises(
     if not workout:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout not found"
+            detail=WORKOUT_NOT_FOUND
         )
 
     exercises = db.query(WorkoutExercise).filter(
@@ -238,7 +245,7 @@ def add_workout_exercise(
     if not workout:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout not found"
+            detail=WORKOUT_NOT_FOUND
         )
 
     # Get the highest order value
@@ -282,7 +289,7 @@ def update_workout_exercise(
     if not workout:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout not found"
+            detail=WORKOUT_NOT_FOUND
         )
 
     # Get the exercise
@@ -294,7 +301,7 @@ def update_workout_exercise(
     if not exercise:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exercise not found"
+            detail=EXERCISE_NOT_FOUND
         )
 
     # Update exercise fields
@@ -325,7 +332,7 @@ def delete_workout_exercise(
     if not workout:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout not found"
+            detail=WORKOUT_NOT_FOUND
         )
 
     # Get the exercise
@@ -337,7 +344,7 @@ def delete_workout_exercise(
     if not exercise:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exercise not found"
+            detail=EXERCISE_NOT_FOUND
         )
 
     db.delete(exercise)
@@ -358,7 +365,7 @@ def generate_workout_schedule(
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found"
+            detail=PROFILE_NOT_FOUND
         )
 
     # Get user preferences
@@ -366,7 +373,7 @@ def generate_workout_schedule(
     if not preferences:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Preferences not found"
+            detail=PREFERENCES_NOT_FOUND
         )
 
     # Check if regenerate flag is set
@@ -481,7 +488,7 @@ def swap_workout_exercise(
     if not workout:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout not found"
+            detail=WORKOUT_NOT_FOUND
         )
 
     # Get the exercise
@@ -493,7 +500,7 @@ def swap_workout_exercise(
     if not exercise:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exercise not found"
+            detail=EXERCISE_NOT_FOUND
         )
 
     # Get user profile and preferences
@@ -501,14 +508,14 @@ def swap_workout_exercise(
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found"
+            detail=PROFILE_NOT_FOUND
         )
 
     preferences = db.query(Preferences).filter(Preferences.profile_id == profile.id).first()
     if not preferences:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Preferences not found"
+            detail=PREFERENCES_NOT_FOUND
         )
 
     # Get all exercises in the workout to avoid duplicates
@@ -519,7 +526,7 @@ def swap_workout_exercise(
     recently_used_exercises = [ex.exercise_id for ex in workout_exercises if ex.id != exercise_id]
 
     # Use the exercise selector service to find a replacement
-    exercise_selector = ExerciseSelectorService()
+    exercise_selector = ExerciseSelectorService(db)
     new_exercise_data = exercise_selector.swap_exercise(
         exercise_id=exercise.exercise_id,
         muscle_group=exercise.muscle_group,

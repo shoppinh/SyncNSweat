@@ -11,11 +11,12 @@ from app.services.exercise import ExerciseService
 from app.core.config import settings
 
 class TestExerciseService(unittest.TestCase):
+    # Have to import db session
     def setUp(self):
         self.exercise_service = ExerciseService()
     
     @patch('requests.get')
-    def test_get_exercises(self, mock_get):
+    def test_get_exercises_from_external_source(self, mock_get):
         # Mock the response from the Exercise API
         mock_response = MagicMock()
         mock_response.json.return_value = [
@@ -35,7 +36,7 @@ class TestExerciseService(unittest.TestCase):
         mock_get.return_value = mock_response
         
         # Call the method
-        result = self.exercise_service.get_exercises()
+        result = self.exercise_service.get_exercises_from_external_source()
         
         # Check the result
         self.assertEqual(len(result), 2)
@@ -52,7 +53,7 @@ class TestExerciseService(unittest.TestCase):
         self.assertEqual(kwargs["headers"]["X-RapidAPI-Host"], settings.EXERCISE_API_HOST)
     
     @patch('requests.get')
-    def test_get_exercise_by_id(self, mock_get):
+    def test_get_exercise_by_id_from_external_source(self, mock_get):
         # Mock the response from the Exercise API
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -70,7 +71,7 @@ class TestExerciseService(unittest.TestCase):
         mock_get.return_value = mock_response
         
         # Call the method
-        result = self.exercise_service.get_exercise_by_id("0001")
+        result = self.exercise_service.get_exercise_by_id_from_external_source("0001")
         
         # Check the result
         self.assertEqual(result["id"], "0001")
@@ -86,7 +87,7 @@ class TestExerciseService(unittest.TestCase):
         self.assertEqual(kwargs["headers"]["X-RapidAPI-Host"], settings.EXERCISE_API_HOST)
     
     @patch('requests.get')
-    def test_get_exercises_by_muscle(self, mock_get):
+    def test_get_exercises_by_muscle_from_external_source(self, mock_get):
         # Mock the response from the Exercise API
         mock_response = MagicMock()
         mock_response.json.return_value = [
@@ -106,7 +107,7 @@ class TestExerciseService(unittest.TestCase):
         mock_get.return_value = mock_response
         
         # Call the method
-        result = self.exercise_service.get_exercises_by_muscle("pectorals")
+        result = self.exercise_service.get_exercises_by_muscle_from_external_source("pectorals")
         
         # Check the result
         self.assertEqual(len(result), 2)

@@ -31,7 +31,17 @@ def synchronize_database(
     db.commit()
     # Fetch all exercises from ExerciseDB API
     
-    exercises = exercise_service.get_exercises(params={"limit": 1324})
+    exercises = [{
+        "id": ex["id"],
+        "name": ex["name"],
+        "body_part": ex["bodyPart"],
+        "target": ex["target"],
+        "secondary_muscles": ex["secondaryMuscles"],
+        "equipment": ex["equipment"],
+        "gif_url": ex["gifUrl"],
+        "instructions": ex["instructions"]
+    } for ex in exercise_service.get_exercises_from_external_source(params={"limit": 1324})]
+    
     # Update Exercise table with fetched data
     db.bulk_insert_mappings(Exercise, exercises)  
         

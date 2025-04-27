@@ -1121,7 +1121,7 @@ CurrentSubStep: ONBOARDING_FLOW # Current sub-step being implemented
              self.api_host = settings.EXERCISE_API_HOST
              self.api_url = "https://exercisedb.p.rapidapi.com"  # Example for ExerciseDB
 
-         def get_exercises(self, params=None):
+         def get_exercises_from_external_source(self, params=None):
              headers = {
                  "X-RapidAPI-Key": self.api_key,
                  "X-RapidAPI-Host": self.api_host
@@ -1130,7 +1130,7 @@ CurrentSubStep: ONBOARDING_FLOW # Current sub-step being implemented
              response = requests.get(f"{self.api_url}/exercises", headers=headers, params=params)
              return response.json()
 
-         def get_exercise_by_id(self, exercise_id):
+         def get_exercise_by_id_from_external_source((self, exercise_id):
              headers = {
                  "X-RapidAPI-Key": self.api_key,
                  "X-RapidAPI-Host": self.api_host
@@ -1139,7 +1139,7 @@ CurrentSubStep: ONBOARDING_FLOW # Current sub-step being implemented
              response = requests.get(f"{self.api_url}/exercises/exercise/{exercise_id}", headers=headers)
              return response.json()
 
-         def get_exercises_by_muscle(self, muscle):
+         def get_exercises_by_muscle_from_external_source(self, muscle):
              headers = {
                  "X-RapidAPI-Key": self.api_key,
                  "X-RapidAPI-Host": self.api_host

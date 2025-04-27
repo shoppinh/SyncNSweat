@@ -1,6 +1,11 @@
 import random
 from typing import List, Dict, Any, Optional
+
+from app.models.workout import Exercise
+from app.schemas.exercise import WorkoutExerciseResponse
 from app.services.exercise import ExerciseService
+from app.utils.helper import safe_int_convert
+from sqlalchemy.orm import Session
 
 class ExerciseSelectorService:
     """
@@ -8,8 +13,8 @@ class ExerciseSelectorService:
     Ensures variety by tracking recently used exercises.
     """
     
-    def __init__(self):
-        self.exercise_service = ExerciseService()
+    def __init__(self, db: Session):
+        self.exercise_service = ExerciseService(db)
     
     def select_exercises_for_workout(
         self,
@@ -39,7 +44,7 @@ class ExerciseSelectorService:
         muscle_groups = self._get_muscle_groups_for_focus(focus)
         
         # Get exercises for each muscle group
-        all_exercises = []
+        all_exercises: List[Exercise] = []
         for muscle in muscle_groups:
             try:
                 muscle_exercises = self.exercise_service.get_exercises_by_muscle(muscle)
@@ -47,12 +52,12 @@ class ExerciseSelectorService:
                 # Filter by available equipment
                 filtered_exercises = [
                     ex for ex in muscle_exercises
-                    if not ex.get("equipment") or ex.get("equipment") in available_equipment
+                    if ex.equipment in available_equipment
                 ]
                 # Filter out recently used exercises
                 filtered_exercises = [
                     ex for ex in filtered_exercises
-                    if ex.get("id") not in recently_used_exercises
+                    if ex.id not in recently_used_exercises
                 ]
                 all_exercises.extend(filtered_exercises)
             except Exception:
@@ -67,11 +72,11 @@ class ExerciseSelectorService:
                     # Filter by available equipment only
                     filtered_exercises = [
                         ex for ex in muscle_exercises
-                        if not ex.get("equipment") or ex.get("equipment") in available_equipment
+                        if ex.equipment in available_equipment
                     ]
                     # Add exercises that weren't already added
                     for ex in filtered_exercises:
-                        if not any(e.get("id") == ex.get("id") for e in all_exercises):
+                        if not any(e.id == ex.id for e in all_exercises):
                             all_exercises.append(ex)
                 except Exception:
                     # If API call fails, continue with other muscle groups
@@ -101,21 +106,15 @@ class ExerciseSelectorService:
                 sets = 5
                 reps = "12-15"
                 rest_seconds = 30
-            
-            workout_exercises.append({
-                "exercise_id": ex.get("id"),
-                "name": ex.get("name"),
-                "instructions": ex.get("instructions", []),
-                "target": ex.get("target"),
-                "body_part": ex.get("bodyPart"),
-                "secondary_muscles": ex.get("secondaryMuscles"),
-                "gif_url": ex.get("gifUrl"),
-                "equipment": ex.get("equipment"),
+
+            exercise_details = {
+                "exercise_id": safe_int_convert(ex.id),
                 "sets": sets,
                 "reps": reps,
                 "rest_seconds": rest_seconds,
                 "order": i + 1,
-            })
+            }
+            workout_exercises.append(exercise_details)
         
         return workout_exercises
     

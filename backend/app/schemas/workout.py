@@ -26,7 +26,7 @@ class WorkoutResponse(WorkoutBase):
     id: int
     user_id: int
     created_at: datetime
-    exercises: List[WorkoutExerciseResponse] = []
+    workout_exercises: List[WorkoutExerciseResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 

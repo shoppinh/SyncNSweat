@@ -5,7 +5,7 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.models.workout import Exercise
-from app.schemas.exercise import (ExerciseCreate, ExerciseResponse,
+from app.schemas.exercise import (ExerciseCreate, ExerciseResponse, ExerciseSearch,
                                   ExerciseUpdate)
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -43,6 +43,33 @@ def read_exercises(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
         _type_: _description_
     """    
     exercises = db.query(Exercise).offset(skip).limit(limit).all()    
+    return exercises
+
+@router.post("/search", response_model=List[ExerciseResponse])
+def search_exercises(search_query: ExerciseSearch, db: Session = Depends(get_db)):
+    """_summary_
+
+    Args:
+        search_query (str): _description_
+        db (Session, optional): _description_. Defaults to Depends(get_db).
+
+    Returns:
+        _type_: _description_
+    """
+    query = db.query(Exercise)
+    if search_query.name:
+        query = query.filter(Exercise.name.ilike(f"%{search_query.name}%"))
+        
+    if search_query.body_part:
+        query = query.filter(Exercise.body_part.ilike(f"%{search_query.body_part}%"))
+        
+    if search_query.target:
+        query = query.filter(Exercise.target.ilike(f"%{search_query.target}%"))
+    
+    if search_query.equipment:
+        query = query.filter(Exercise.equipment.ilike(f"%{search_query.equipment}%"))
+        
+    exercises = query.all()
     return exercises
 
 @router.get("/{exercise_id}", response_model=ExerciseResponse)

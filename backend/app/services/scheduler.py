@@ -2,14 +2,15 @@ import random
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from app.services.exercise import ExerciseService
+from sqlalchemy.orm import Session
 
 class SchedulerService:
     """
     Service for generating workout schedules based on user preferences.
     """
     
-    def __init__(self):
-        self.exercise_service = ExerciseService()
+    def __init__(self, db: Session):
+        self.exercise_service = ExerciseService(db)
     
     def generate_weekly_schedule(
         self,
