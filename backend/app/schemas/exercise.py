@@ -1,14 +1,29 @@
-from pydantic import BaseModel, ConfigDict
-from typing import List, Optional, Union
+from typing import List, Optional
 
-class WorkoutExerciseBase(BaseModel):
-    exercise_id: str
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
+
+class ExerciseBase(BaseModel):
     name: str
     instructions: Optional[List[str]] = None
     target: str
     secondary_muscles: Optional[List[str]] = None
     gif_url: Optional[str] = None
     equipment: Optional[str] = None
+
+class ExerciseCreate(ExerciseBase):
+    name: str
+
+class ExerciseUpdate(ExerciseBase):
+    pass
+
+class ExerciseResponse(ExerciseBase):
+    id: str
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True,from_attributes=True)
+
+class WorkoutExerciseBase(ExerciseBase):
+    exercise_id: int
+    order: int
     sets: int
     reps: str
     rest_seconds: int
@@ -25,6 +40,6 @@ class WorkoutExerciseUpdate(BaseModel):
 class WorkoutExerciseResponse(WorkoutExerciseBase):
     id: int
     workout_id: int
-    order: int
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True,from_attributes=True)
+

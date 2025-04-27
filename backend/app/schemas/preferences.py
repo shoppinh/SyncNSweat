@@ -10,9 +10,6 @@ class PreferencesBase(BaseModel):
     exercise_types: Optional[List[str]] = None
     spotify_connected: Optional[bool] = None
     spotify_data: Optional[Dict[str, Any]] = None
-    
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
-
 class PreferencesCreate(PreferencesBase):
     pass
 
@@ -23,4 +20,4 @@ class PreferencesResponse(PreferencesBase):
     id: int
     profile_id: int
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True,from_attributes=True)
