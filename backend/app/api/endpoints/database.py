@@ -25,7 +25,7 @@ def synchronize_database(
         _type_: _description_
     """
     
-    exercise_service = ExerciseService()
+    exercise_service = ExerciseService(db)
     # Delete all existing exercises
     db.query(Exercise).delete()    
     db.commit()

@@ -47,8 +47,7 @@ class ExerciseSelectorService:
         all_exercises: List[Exercise] = []
         for muscle in muscle_groups:
             try:
-                muscle_exercises = self.exercise_service.get_exercises_by_muscle(muscle)
-                muscle_exercises = muscle_exercises[:2]  # Limit to 2 exercises per muscle group
+                muscle_exercises = self.exercise_service.get_exercises_by_muscle(muscle)[:3]
                 # Filter by available equipment
                 filtered_exercises = [
                     ex for ex in muscle_exercises
