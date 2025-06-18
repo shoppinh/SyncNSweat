@@ -6,11 +6,7 @@ services:
     container_name: syncnsweat_postgres
     restart: always
     env_file:
-      - .env
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      - ./backend/.env
     ports:
       - "5432:5432"
     volumes:
@@ -24,15 +20,7 @@ services:
     depends_on:
       - db
     env_file:
-      - .env
-    environment:
-      DATABASE_URI: ${DATABASE_URI}
-      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
-      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
-      SECRET_KEY: ${SECRET_KEY}
-      EXERCISE_API_KEY: ${EXERCISE_API_KEY}
-      EXERCISE_API_HOST: ${EXERCISE_API_HOST}
-      # Add other environment variables as needed, or load from .env
+      - ./backend/.env
     ports:
       - "8000:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
