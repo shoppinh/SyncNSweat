@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "development_secret_key")
     DATABASE_URI: str = os.getenv("DATABASE_URI", "postgresql://postgres:postgres@localhost/syncnsweat")
+    API_URL = os.getenv("API_URL", "http://localhost:8000")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
 
     # Spotify API settings

@@ -1,8 +1,7 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from typing import Dict, Any
 
 from app.db.session import get_db
 from app.models.user import User
@@ -10,7 +9,7 @@ from app.models.profile import Profile
 from app.models.preferences import Preferences
 from app.core.security import create_access_token, verify_password, get_password_hash, get_current_user
 from app.core.config import settings
-from app.schemas.token import Token, TokenPayload
+from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
 from app.services.spotify import SpotifyService
 
@@ -102,19 +101,16 @@ def refresh_token(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/spotify/callback")
+@router.post("/spotify/callback/")
 def spotify_callback(
-    request: Request,
+    code: str = Query(None, description="Spotify authorization code"),
+    state: str = Query(None, description="State parameter (user ID)"),
+    error: str = Query(None, description="Spotify error, if any"),
     db: Session = Depends(get_db)
 ):
     """
     Handle Spotify OAuth callback.
     """
-    # Get query parameters
-    code = request.query_params.get("code")
-    state = request.query_params.get("state")
-    error = request.query_params.get("error")
-
     if error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
