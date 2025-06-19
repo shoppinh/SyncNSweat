@@ -16,11 +16,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the backend code
 COPY . .
 
+# Run migrations
+RUN alembic upgrade head 
 # Expose FastAPI port
-EXPOSE 8000
+EXPOSE 8080
 
 # Set environment variables (optional, for production best practice)
 ENV PYTHONUNBUFFERED=1
 
 # Run the FastAPI app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

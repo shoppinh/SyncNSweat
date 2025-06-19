@@ -7,7 +7,12 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.profile import Profile
 from app.models.preferences import Preferences
-from app.core.security import create_access_token, verify_password, get_password_hash, get_current_user
+from app.core.security import (
+    create_access_token,
+    verify_password,
+    get_password_hash,
+    get_current_user,
+)
 from app.core.config import settings
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
@@ -15,11 +20,11 @@ from app.services.spotify import SpotifyService
 
 router = APIRouter()
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(
-    user_in: UserCreate,
-    db: Session = Depends(get_db)
-):
+
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
+def register(user_in: UserCreate, db: Session = Depends(get_db)):
     """
     Register a new user.
     """
@@ -27,17 +32,12 @@ def register(
     db_user = db.query(User).filter(User.email == user_in.email).first()
     if db_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
 
     # Create new user
     hashed_password = get_password_hash(user_in.password)
-    db_user = User(
-        email=user_in.email,
-        hashed_password=hashed_password,
-        is_active=True
-    )
+    db_user = User(email=user_in.email, hashed_password=hashed_password, is_active=True)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -56,10 +56,10 @@ def register(
 
     return db_user
 
+
 @router.post("/login", response_model=Token)
 def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
     """
     OAuth2 compatible token login, get an access token for future requests.
@@ -78,20 +78,19 @@ def login(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @router.post("/token", response_model=Token)
 def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
     """
     OAuth2 compatible token login, get an access token for future requests.
     """
     return login(form_data, db)
 
+
 @router.post("/refresh-token", response_model=Token)
-def refresh_token(
-    current_user: User = Depends(get_current_user)
-):
+def refresh_token(current_user: User = Depends(get_current_user)):
     """
     Refresh access token.
     """
@@ -101,12 +100,13 @@ def refresh_token(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/spotify/callback/")
+
+@router.get("/spotify/callback/")
 def spotify_callback(
     code: str = Query(None, description="Spotify authorization code"),
     state: str = Query(None, description="State parameter (user ID)"),
     error: str = Query(None, description="Spotify error, if any"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Handle Spotify OAuth callback.
@@ -114,48 +114,47 @@ def spotify_callback(
     if error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Spotify authentication error: {error}"
+            detail=f"Spotify authentication error: {error}",
         )
 
     if not code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Authorization code is required"
+            detail="Authorization code is required",
         )
 
     # Get user ID from state parameter
     if not state:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="State parameter is required"
+            detail="State parameter is required",
         )
 
     try:
         user_id = int(state)
     except ValueError:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid state parameter"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state parameter"
         )
 
     # Get user
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
     # Get user profile
     profile = db.query(Profile).filter(Profile.user_id == user.id).first()
     if not profile:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found"
         )
 
     # Get user preferences
-    preferences = db.query(Preferences).filter(Preferences.profile_id == profile.id).first()
+    preferences = (
+        db.query(Preferences).filter(Preferences.profile_id == profile.id).first()
+    )
     if not preferences:
         # Create preferences if they don't exist
         preferences = Preferences(profile_id=profile.id)
@@ -165,13 +164,13 @@ def spotify_callback(
 
     # Exchange code for access token
     spotify_service = SpotifyService()
-    redirect_uri = "http://localhost:8000/api/v1/auth/spotify/callback"
+    redirect_uri = f"{settings.SPOTIFY_REDIRECT_URL}/api/v1/auth/spotify/callback"
     token_data = spotify_service.get_access_token(code, redirect_uri)
 
     if "error" in token_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Spotify token error: {token_data['error']}"
+            detail=f"Spotify token error: {token_data['error']}",
         )
 
     # Store token in user preferences
@@ -180,7 +179,7 @@ def spotify_callback(
         "access_token": token_data.get("access_token"),
         "refresh_token": token_data.get("refresh_token"),
         "expires_in": token_data.get("expires_in"),
-        "token_type": token_data.get("token_type")
+        "token_type": token_data.get("token_type"),
     }
 
     db.add(preferences)
@@ -189,5 +188,5 @@ def spotify_callback(
     # Return success message with redirect URL
     return {
         "message": "Spotify authentication successful",
-        "redirect_url": "syncnsweat://spotify-callback?success=true"
+        "redirect_url": "syncnsweat://spotify-callback?success=true",
     }
