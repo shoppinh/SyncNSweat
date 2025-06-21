@@ -1,51 +1,30 @@
-name: Backend CI
+name: Deploy to Google Cloud Run
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main  # or 'production'
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
       with:
-        python-version: '3.9'
-        cache: 'pip'
-        cache-dependency-path: backend/requirements.txt
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        export_default_credentials: true
 
-    - name: Install dependencies
+    - name: Build and deploy to Cloud Run
       run: |
-        cd backend
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov flake8
-
-    - name: Lint with flake8
-      run: |
-        cd backend
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-
-    - name: Test with pytest
-      run: |
-        cd backend
-        pytest --cov=app
-      env:
-        DATABASE_URI: postgresql://postgres:postgres@localhost:5432/test_db
-        SECRET_KEY: test_secret_key
+        gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.CLOUD_RUN_SERVICE_NAME }}
+        gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE_NAME }} \
+          --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.CLOUD_RUN_SERVICE_NAME }} \
+          --region ${{ secrets.GCP_REGION }} \
+          --platform managed \
+          --allow-unauthenticated

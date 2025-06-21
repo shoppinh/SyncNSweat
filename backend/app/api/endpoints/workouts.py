@@ -63,7 +63,7 @@ def create_random_workout(
       Example:  
       `["abductors", "abs", "adductors", "biceps", "calves", "cardiovascular system", "delts", "forearms", "glutes", "hamstrings", "lats", "levator scapulae", "pectorals", "quads", "serratus anterior", "spine", "traps", "triceps", "upper back"]`
     """
-    db_workout = Workout(user_id=current_user.id, focus=suggest_in.focus, duration_minutes=suggest_in.duration_minutes, date=datetime.now())
+    db_workout = Workout(user_id=current_user.id, focus=suggest_in.focus, duration_minutes=suggest_in.duration_minutes, date=datetime.now(), playlist_id=suggest_in.playlist_id, playlist_name=suggest_in.playlist_name)
     db.add(db_workout)
     db.flush()
     

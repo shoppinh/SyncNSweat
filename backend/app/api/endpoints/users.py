@@ -28,14 +28,14 @@ def read_user_me(current_user: User = Depends(get_current_user)):
 def update_user_me(
     user_in: UserUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Update current user.
     """
-    
-    updated_user = get_current_user()
-    
-    
+
+    updated_user = current_user
+
     if user_in.password:
         hashed_password = get_password_hash(user_in.password)
         updated_user.hashed_password = hashed_password
