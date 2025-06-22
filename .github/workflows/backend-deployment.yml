@@ -35,10 +35,9 @@ on:
       - '"main"'
 
 env:
-  PROJECT_ID: 'my-project' # TODO: update to your Google Cloud project ID
-  REGION: 'us-central1' # TODO: update to your region
-  SERVICE: 'my-service' # TODO: update to your service name
-  WORKLOAD_IDENTITY_PROVIDER: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider' # TODO: update to your workload identity provider
+  PROJECT_ID: '${{ secrets.PROJECT_ID }}' # TODO: update to your Google Cloud project ID
+  REGION: '${{ secrets.GCP_REGION }}' # TODO: update to your region
+  SERVICE: 'syncnsweat-be' # TODO: update to your service name
 
 jobs:
   deploy:
@@ -60,17 +59,14 @@ jobs:
         name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@f112390a2df9932162083945e46d439060d66ec2' # google-github-actions/auth@v2
         with:
-          workload_identity_provider: '${{ env.WORKLOAD_IDENTITY_PROVIDER }}'
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
       # BEGIN - Docker auth and build
       #
       # If you already have a container image, you can omit these steps.
       - name: 'Docker Auth'
-        uses: 'docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567' # docker/login-action@v3
-        with:
-          username: 'oauth2accesstoken'
-          password: '${{ steps.auth.outputs.auth_token }}'
-          registry: '${{ env.REGION }}-docker.pkg.dev'
+        run: |
+          gcloud auth configure-docker "$${{ env.REGION }}-docker.pkg.dev"
 
       - name: 'Build and Push Container'
         run: |-
