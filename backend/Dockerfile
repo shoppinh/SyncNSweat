@@ -16,13 +16,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the backend code
 COPY . .
 
-# Run migrations
-RUN alembic upgrade head 
+# Make the entrypoint script executable
+RUN chmod +x entrypoint.sh
+
 # Expose FastAPI port
 EXPOSE 8080
 
 # Set environment variables (optional, for production best practice)
 ENV PYTHONUNBUFFERED=1
 
-# Run the FastAPI app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Use the entrypoint script
+ENTRYPOINT ["./entrypoint.sh"]
