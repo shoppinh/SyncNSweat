@@ -28,11 +28,11 @@
 # 3. Change the values in the "env" block to match your values.
 
 name: 'Build and Deploy to Cloud Run'
-
 on:
   push:
-    branches:
-      - '"main"'
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 env:
   PROJECT_ID: '${{ secrets.PROJECT_ID }}' # TODO: update to your Google Cloud project ID
