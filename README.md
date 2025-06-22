@@ -1,114 +1,67 @@
-# Sync & Sweat
+# Sync & Sweat Backend
 
-A personalized fitness companion that eliminates workout and music monotony by generating dynamic weekly gym schedules and curating fresh Spotify playlists.
-
-## Features
-
-- User profiling & goal setting
-- AI-powered weekly schedule generation
-- Daily exercise rotation engine
-- Spotify playlist integration & rotation
-- Personalized workout recommendations
-- Clean, intuitive mobile interface
-
-## Tech Stack
-
-- **Frontend**: React Native with Expo (TypeScript)
-- **Backend**: Python with FastAPI
-- **Database**: PostgreSQL
-- **APIs**: Spotify Web API, ExerciseDB API
+This is the backend API for Sync & Sweat, built with FastAPI and PostgreSQL.
 
 ## Getting Started
 
-### Prerequisites
+1. Create and activate a virtual environment:
 
-- Node.js (v16+)
-- npm or yarn
-- Python 3.9+
-- PostgreSQL
-- Spotify Developer Account
-- ExerciseDB API Key
+```bash
+# Windows
+python -m venv .venv
+.venv\Scripts\activate
 
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```
-   cd SyncSweatApp
-   ```
+# macOS/Linux
+python -m venv .venv
+source .venv/bin/activate
+```
 
 2. Install dependencies:
-   ```
-   npm install
-   ```
 
-3. Start the Expo development server:
-   ```
-   npx expo start
-   ```
-
-### Backend Setup
-
-1. Navigate to the backend directory:
-   ```
-   cd backend
-   ```
-
-2. Activate the virtual environment:
-   ```
-   # On Windows
-   venv\Scripts\activate
-   
-   # On macOS/Linux
-   source venv/bin/activate
-   ```
-
-3. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-4. Set up environment variables:
-   - Create a `.env` file based on the provided example
-   - Add your Spotify API credentials and ExerciseDB API key
-
-5. Run the development server:
-   ```
-   uvicorn app.main:app --reload
-   ```
-
-## Project Structure
-
-```
-syncnsweat/
-├── SyncSweatApp/         # React Native frontend
-│   ├── src/
-│   │   ├── components/   # Reusable UI components
-│   │   ├── screens/      # App screens
-│   │   ├── navigation/   # Navigation configuration
-│   │   ├── contexts/     # React contexts
-│   │   ├── services/     # API services
-│   │   ├── hooks/        # Custom hooks
-│   │   ├── utils/        # Utility functions
-│   │   └── theme/        # Styling and theme
-│   └── ...
-│
-├── backend/              # FastAPI backend
-│   ├── app/
-│   │   ├── api/          # API endpoints
-│   │   ├── core/         # Core configuration
-│   │   ├── db/           # Database setup
-│   │   ├── models/       # Database models
-│   │   └── services/     # Business logic
-│   └── ...
-│
-└── ...
+```bash
+pip install -r requirements.txt
 ```
 
-## License
+3. Set up environment variables:
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Create a `.env` file with the following variables:
+```
+DATABASE_URL=postgresql://username:password@localhost:5432/syncnsweat
+SECRET_KEY=your_secret_key
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+EXERCISEDB_API_KEY=your_exercisedb_api_key
+```
 
-## Acknowledgments
+4. Run database migrations:
 
-- Spotify Web API
-- ExerciseDB API
+```bash
+alembic upgrade head
+```
+
+5. Start the development server:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+## API Documentation
+
+Once the server is running, you can access the API documentation at:
+
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+## Running Tests
+
+To run the tests:
+
+```bash
+pytest
+```
+
+To run tests with coverage:
+
+```bash
+pytest --cov=app
+```
