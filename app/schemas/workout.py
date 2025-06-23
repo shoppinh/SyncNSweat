@@ -38,3 +38,14 @@ class ScheduleResponse(BaseModel):
     """Response model for a generated workout schedule."""
     workouts: List[WorkoutResponse]
     message: str
+
+class UserProfile(BaseModel):
+    age: int
+    fitness_level: str
+    goals: List[str]
+    available_equipment: List[str]
+    preferences: Optional[Dict[str, Any]] = None
+
+class WorkoutAIResponse(BaseModel):
+    workout_plan: Dict[str, Any]
+    message: str

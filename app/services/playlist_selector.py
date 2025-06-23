@@ -9,6 +9,25 @@ class PlaylistSelectorService:
     
     def __init__(self):
         self.spotify_service = SpotifyService()
+        self.energy_map = {
+            "Full Body": 0.8,
+            "Upper Body": 0.7,
+            "Lower Body": 0.8,
+            "Push": 0.7,
+            "Pull": 0.7,
+            "Legs": 0.8,
+            "Chest": 0.7,
+            "Back": 0.7,
+            "Shoulders": 0.7,
+            "Arms": 0.6,
+            "Core": 0.6
+        }
+        
+        self.tempo_map = {
+            "slow": 100,
+            "medium": 130,
+            "fast": 160
+        }
     
     def select_playlist_for_workout(
         self,
@@ -35,30 +54,11 @@ class PlaylistSelectorService:
             recently_used_playlists = []
         
         # Map workout focus to energy level
-        energy_map = {
-            "Full Body": 0.8,
-            "Upper Body": 0.7,
-            "Lower Body": 0.8,
-            "Push": 0.7,
-            "Pull": 0.7,
-            "Legs": 0.8,
-            "Chest": 0.7,
-            "Back": 0.7,
-            "Shoulders": 0.7,
-            "Arms": 0.6,
-            "Core": 0.6
-        }
-        
-        # Map tempo to target tempo (BPM)
-        tempo_map = {
-            "slow": 100,
-            "medium": 130,
-            "fast": 160
-        }
-        
         # Get energy level and tempo based on workout focus and user preferences
-        target_energy = energy_map.get(workout_focus, 0.7)
-        target_tempo = tempo_map.get(music_tempo, 130)
+
+        target_params = self.calculate_target_params(workout_focus, music_tempo)
+        target_energy = target_params["target_energy"]
+        target_tempo = target_params["target_tempo"]
         
         # Get recommendations from Spotify
         recommendations = self.spotify_service.get_recommendations(
@@ -157,13 +157,10 @@ class PlaylistSelectorService:
             A list of playlist dictionaries
         """
         # Map tempo to target tempo (BPM)
-        tempo_map = {
-            "slow": 100,
-            "medium": 130,
-            "fast": 160
-        }
+
         
-        target_tempo = tempo_map.get(music_tempo, 130)
+        target_params = self.calculate_target_params(None, music_tempo)
+        target_tempo = target_params["target_tempo"]
         
         # Get recommendations from Spotify
         recommendations = self.spotify_service.get_recommendations(
@@ -235,3 +232,20 @@ class PlaylistSelectorService:
             })
         
         return playlists
+
+    def calculate_target_params(
+    self,
+    workout_focus: Optional[str] = None,
+    music_tempo: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """        Calculate target parameters for recommendations based on workout type and music tempo.
+        """
+        # Map workout type to energy level
+        target_energy = self.energy_map.get(workout_focus, 0.7)
+        target_tempo = self.tempo_map.get(music_tempo, 130)
+
+        return {
+            "target_energy": target_energy,
+            "target_tempo": target_tempo
+        }
+        

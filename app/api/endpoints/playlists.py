@@ -60,22 +60,63 @@ def get_spotify_recommendations(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Spotify not connected"
         )
 
-    # This is a placeholder for the actual Spotify recommendation logic
-    # In a real implementation, we would:
-    # 1. Use the SpotifyService to get recommendations based on preferences
-    # 2. Create a playlist for the workout
-    # 3. Return the playlist details
+    # Get Spotify access token from preferences
+    spotify_data = preferences.spotify_data
+    if not spotify_data or "access_token" not in spotify_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Spotify access token not found",
+        )
 
-    # Mock response
+    access_token = spotify_data["access_token"]
+
+    # Initialize SpotifyService
+    spotify_service = SpotifyService()
+    playlist_selector = PlaylistSelectorService()
+
+    # Get seed tracks and genres based on preferences and workout type
+    seed_tracks = spotify_service.get_seed_tracks(
+        access_token=access_token,
+        genres=preferences.music_genres,
+        workout_type=workout_type,
+    )
+
+    # # Calculate target parameters based on workout type and preferences
+    target_params = playlist_selector.calculate_target_params(
+        workout_focus=workout_type, music_tempo=preferences.music_tempo
+    )
+
+    # Get recommendations from Spotify
+    recommendations = spotify_service.get_recommendations(
+        access_token=access_token,
+        seed_tracks=seed_tracks,
+        target_tempo=target_params["target_tempo"],
+        target_energy=target_params["target_energy"],
+    )
+
+    # Create a new playlist for the workout
+    playlist = spotify_service.create_workout_playlist(
+        access_token=access_token,
+        track_uris=[track["uri"] for track in recommendations["tracks"]],
+        workout_type=workout_type,
+        user_id=current_user.id,
+    )
+
     return {
-        "playlist_id": "spotify:playlist:37i9dQZF1DX76Wlfdnj7AP",
-        "playlist_name": f"Workout Mix: {workout_type or 'General'}",
+        "playlist_id": playlist["id"],
+        "playlist_name": playlist["name"],
         "tracks": [
-            {"name": "Track 1", "artist": "Artist 1", "duration_ms": 180000},
-            {"name": "Track 2", "artist": "Artist 2", "duration_ms": 210000},
-            {"name": "Track 3", "artist": "Artist 3", "duration_ms": 195000},
+            {
+                "name": track["name"],
+                "artist": track["artists"][0]["name"],
+                "duration_ms": track["duration_ms"],
+                "uri": track["uri"],
+            }
+            for track in recommendations["tracks"]
         ],
         "total_duration_minutes": duration_minutes,
+        "external_url": playlist["external_url"],
+        "image_url": playlist.get("image_url"),
     }
 
 

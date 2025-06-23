@@ -9,11 +9,12 @@ from app.models.user import User
 from app.models.profile import Profile
 from app.models.preferences import Preferences
 from app.models.workout import Exercise, Workout, WorkoutExercise
-from app.schemas.workout import WorkoutBase, WorkoutCreate, WorkoutResponse, WorkoutSuggest, WorkoutUpdate, ScheduleResponse, ScheduleRequest
+from app.schemas.workout import UserProfile, WorkoutAIResponse, WorkoutBase, WorkoutCreate, WorkoutResponse, WorkoutSuggest, WorkoutUpdate, ScheduleResponse, ScheduleRequest
 from app.schemas.exercise import WorkoutExerciseCreate, WorkoutExerciseResponse, WorkoutExerciseUpdate
 from app.core.security import get_current_user
 from app.services.scheduler import SchedulerService
 from app.services.exercise_selector import ExerciseSelectorService
+from app.services.gemini import GeminiService
 
 # Define constants for error messages
 WORKOUT_NOT_FOUND = "Workout not found"
@@ -122,6 +123,32 @@ def create_workout(
         db.refresh(db_workout)
 
     return db_workout
+
+@router.get("/today", response_model=WorkoutResponse)
+def get_today_workout(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get today's workout.
+    """
+    today = datetime.now().date()
+
+    # Get workout for today
+    workout = db.query(Workout).filter(
+        Workout.user_id == current_user.id,
+        Workout.date >= datetime.combine(today, datetime.min.time()),
+        Workout.date <= datetime.combine(today, datetime.max.time())
+    ).first()
+
+    if not workout:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No workout scheduled for today"
+        )
+
+    return workout
+
 
 @router.get("/{workout_id}", response_model=WorkoutResponse)
 def read_workout(
@@ -444,31 +471,6 @@ def generate_workout_schedule(
         message="Generated new workout schedule"
     )
 
-@router.get("/today", response_model=WorkoutResponse)
-def get_today_workout(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get today's workout.
-    """
-    today = datetime.now().date()
-
-    # Get workout for today
-    workout = db.query(Workout).filter(
-        Workout.user_id == current_user.id,
-        Workout.date >= datetime.combine(today, datetime.min.time()),
-        Workout.date <= datetime.combine(today, datetime.max.time())
-    ).first()
-
-    if not workout:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No workout scheduled for today"
-        )
-
-    return workout
-
 @router.post("/{workout_id}/exercises/{exercise_id}/swap", response_model=WorkoutExerciseResponse)
 def swap_workout_exercise(
     workout_id: int,
@@ -553,4 +555,44 @@ def swap_workout_exercise(
     db.refresh(exercise)
 
     return exercise
+
+@router.post("/ai-recommendations", response_model=WorkoutAIResponse)
+async def get_ai_workout_recommendations(
+    workout_type: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    gemini_service: GeminiService = Depends(lambda: GeminiService())
+):
+    """Get AI-enhanced workout recommendations."""
+    # we can get user profile based on current_user
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=PROFILE_NOT_FOUND
+        )
+
+    preferences = db.query(Preferences).filter(Preferences.profile_id == profile.id).first()
+    if not preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Preferences not found"
+        )
+    
+
+    try:
+        recommendations = await gemini_service.get_workout_recommendations(
+            profile,
+            preferences,
+            workout_type
+        )
+        return WorkoutAIResponse(
+            workout_plan=recommendations,
+            message="Successfully generated AI workout recommendations"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating AI recommendations: {str(e)}"
+        )
 

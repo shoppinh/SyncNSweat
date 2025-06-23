@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Exercise API settings
     EXERCISE_API_KEY: Optional[str] = os.getenv("EXERCISE_API_KEY")
     EXERCISE_API_HOST: Optional[str] = os.getenv("EXERCISE_API_HOST")
+    
+    # Google Gemini settings
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY")
 
 
 settings = Settings()

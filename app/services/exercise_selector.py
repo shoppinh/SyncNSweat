@@ -40,7 +40,7 @@ class ExerciseSelectorService:
         if not recently_used_exercises:
             recently_used_exercises = []
         
-        # Get muscle groups for the focus
+        # Get muscle groups for he focus
         muscle_groups = self._get_muscle_groups_for_focus(focus)
         
         # Get exercises for each muscle group
