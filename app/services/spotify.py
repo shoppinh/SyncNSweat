@@ -175,31 +175,6 @@ class SpotifyService:
         tracks = response.json().get("tracks", [])
         return [track["id"] for track in tracks]
 
-    def calculate_target_parameters(self, workout_type: str, music_tempo: str) -> dict:
-        """Calculate target parameters based on workout type and preferences."""
-        params = {
-            "cardio": {
-                "min_tempo": 120,
-                "target_energy": 0.8,
-                "target_valence": 0.7,
-            },
-            "strength": {
-                "min_tempo": 100,
-                "target_energy": 0.9,
-                "target_valence": 0.6,
-            },
-            "yoga": {
-                "max_tempo": 100,
-                "target_energy": 0.4,
-                "target_valence": 0.5,
-            }
-        }
-        
-        return params.get(workout_type, {
-            "target_energy": 0.6,
-            "target_valence": 0.6
-        })
-
     async def calculate_target_parameters(self, workout_type: str, music_tempo: str, user_preferences: dict) -> dict:
         """Enhanced target parameters using Gemini AI."""
         # Get AI-enhanced parameters
