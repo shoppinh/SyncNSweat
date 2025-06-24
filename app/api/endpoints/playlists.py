@@ -8,6 +8,7 @@ from app.models.user import User
 from app.models.profile import Profile
 from app.models.preferences import Preferences
 from app.models.workout import Workout
+from app.services.gemini import GeminiService
 from app.services.spotify import SpotifyService
 from app.services.playlist_selector import PlaylistSelectorService
 from app.core.security import get_current_user
@@ -30,7 +31,7 @@ def get_spotify_auth_url(
 
 
 @router.get("/spotify/recommendations")
-def get_spotify_recommendations(
+async def get_spotify_recommendations(
     workout_type: str = None,
     duration_minutes: int = 60,
     current_user: User = Depends(get_current_user),
@@ -68,56 +69,35 @@ def get_spotify_recommendations(
             detail="Spotify access token not found",
         )
 
-    access_token = spotify_data["access_token"]
 
     # Initialize SpotifyService
-    spotify_service = SpotifyService()
-    playlist_selector = PlaylistSelectorService()
+    gemini_service = GeminiService()
 
     # Get seed tracks and genres based on preferences and workout type
-    seed_tracks = spotify_service.get_seed_tracks(
-        access_token=access_token,
-        genres=preferences.music_genres,
+    # seed_tracks = spotify_service.get_seed_tracks(
+    #     access_token=access_token,
+    #     genres=preferences.music_genres,
+    #     workout_type=workout_type,
+    # )
+
+
+    # Get recommendations from Gemini
+    recommendations = await gemini_service.recommend_spotify_playlist(
+        user_profile=profile,
+        user_preferences=preferences,
         workout_type=workout_type,
-    )
-
-    # # Calculate target parameters based on workout type and preferences
-    target_params = playlist_selector.calculate_target_params(
-        workout_focus=workout_type, music_tempo=preferences.music_tempo
-    )
-
-    # Get recommendations from Spotify
-    recommendations = spotify_service.get_recommendations(
-        access_token=access_token,
-        seed_tracks=seed_tracks,
-        target_tempo=target_params["target_tempo"],
-        target_energy=target_params["target_energy"],
+        duration_minutes=duration_minutes
     )
 
     # Create a new playlist for the workout
-    playlist = spotify_service.create_workout_playlist(
-        access_token=access_token,
-        track_uris=[track["uri"] for track in recommendations["tracks"]],
-        workout_type=workout_type,
-        user_id=current_user.id,
-    )
+    # playlist = spotify_service.create_workout_playlist(
+    #     access_token=access_token,
+    #     track_uris=[track["uri"] for track in recommendations["tracks"]],
+    #     workout_type=workout_type,
+    #     user_id=current_user.id,
+    # )
 
-    return {
-        "playlist_id": playlist["id"],
-        "playlist_name": playlist["name"],
-        "tracks": [
-            {
-                "name": track["name"],
-                "artist": track["artists"][0]["name"],
-                "duration_ms": track["duration_ms"],
-                "uri": track["uri"],
-            }
-            for track in recommendations["tracks"]
-        ],
-        "total_duration_minutes": duration_minutes,
-        "external_url": playlist["external_url"],
-        "image_url": playlist.get("image_url"),
-    }
+    return recommendations
 
 
 @router.get("/spotify/playlists")
