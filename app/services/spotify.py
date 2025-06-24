@@ -2,7 +2,6 @@ import base64
 import requests
 from typing import Dict, List, Optional, Any
 from app.core.config import settings
-from app.services.gemini import GeminiService  # Import GeminiService
 
 class SpotifyService:
     def __init__(self):
@@ -11,7 +10,6 @@ class SpotifyService:
         self.auth_url = "https://accounts.spotify.com/authorize"
         self.token_url = "https://accounts.spotify.com/api/token"
         self.api_base_url = "https://api.spotify.com/v1"
-        self.gemini_service = GeminiService()  # Initialize GeminiService
     
     def get_auth_url(self, redirect_uri: str, state: Optional[str] = None) -> str:
         """
@@ -21,7 +19,7 @@ class SpotifyService:
             "client_id": self.client_id,
             "response_type": "code",
             "redirect_uri": redirect_uri,
-            "scope": "user-read-private user-read-email playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public"
+            "scope": "user-read-private user-read-email user-library-read user-library-modify user-top-read user-read-playback-state user-modify-playback-state playlist-read-private playlist-modify-public playlist-modify-private"
         }
         if state:
             params["state"] = state
@@ -64,7 +62,7 @@ class SpotifyService:
         response = requests.post(self.token_url, headers=headers, data=data)
         return response.json()
     
-    def get_user_profile(self, access_token: str) -> Dict[str, Any]:
+    async def get_user_profile(self, access_token: str) -> Dict[str, Any]:
         """
         Get the user's Spotify profile.
         """
@@ -75,7 +73,7 @@ class SpotifyService:
         response = requests.get(f"{self.api_base_url}/me", headers=headers)
         return response.json()
     
-    def get_user_playlists(self, access_token: str, limit: int = 50) -> Dict[str, Any]:
+    async def get_user_playlists(self, access_token: str, limit: int = 50) -> Dict[str, Any]:
         """
         Get the user's playlists.
         """
@@ -86,7 +84,7 @@ class SpotifyService:
         response = requests.get(f"{self.api_base_url}/me/playlists?limit={limit}", headers=headers)
         return response.json()
     
-    def create_playlist(
+    async def create_playlist(
         self,
         access_token: str,
         user_id: str,
@@ -114,7 +112,7 @@ class SpotifyService:
         )
         return response.json()
     
-    def add_tracks_to_playlist(
+    async def add_tracks_to_playlist(
         self,
         access_token: str,
         playlist_id: str,
@@ -138,7 +136,7 @@ class SpotifyService:
         )
         return response.json()
     
-    def get_seed_tracks(self, access_token: str, genres: list, workout_type: str) -> list:
+    async def get_seed_tracks(self, access_token: str, genres: list, workout_type: str) -> list:
         """Get seed tracks based on genres and workout type."""
         headers = {
             "Authorization": f"Bearer {access_token}"
@@ -175,52 +173,6 @@ class SpotifyService:
         tracks = response.json().get("tracks", [])
         return [track["id"] for track in tracks]
 
-    async def calculate_target_parameters(self, workout_type: str, music_tempo: str, user_preferences: dict) -> dict:
-        """Enhanced target parameters using Gemini AI."""
-        # Get AI-enhanced parameters
-        enhanced_params = await self.gemini_service.enhance_playlist_parameters(
-            workout_type,
-            user_preferences
-        )
-        
-        # Merge with existing parameters
-        base_params = super().calculate_target_parameters(workout_type, music_tempo)
-        return {**base_params, **enhanced_params}
-
-    def get_recommendations(self, access_token: str, seed_tracks: list, 
-                          target_params: dict, duration_minutes: int) -> dict:
-        """Get track recommendations from Spotify."""
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-        
-        # Calculate number of tracks needed based on duration
-        avg_track_duration = 3.5 * 60 * 1000  # 3.5 minutes in milliseconds
-        target_track_count = int((duration_minutes * 60 * 1000) / avg_track_duration)
-        
-        # Prepare parameters for recommendations API
-        params = {
-            "limit": min(target_track_count + 5, 100),  # Add buffer, max 100
-            "seed_tracks": ",".join(seed_tracks),
-            "min_popularity": 20,  # Ensure somewhat popular tracks
-        }
-        
-        # Add target parameters
-        params.update({
-            f"target_{key}": value 
-            for key, value in target_params.items()
-        })
-        
-        response = requests.get(
-            f"{self.api_base_url}/recommendations",
-            headers=headers,
-            params=params
-        )
-        
-        if response.status_code != 200:
-            raise Exception(f"Failed to get recommendations: {response.json()}")
-        
-        return response.json()
 
     def create_workout_playlist(self, access_token: str, track_uris: list, 
                               workout_type: str, user_id: str) -> dict:
@@ -267,6 +219,46 @@ class SpotifyService:
             "external_url": playlist["external_urls"]["spotify"],
             "image_url": playlist["images"][0]["url"] if playlist.get("images") else None,
         }
+
+    async def get_current_user_top_tracks(self, access_token: str) -> dict:
+        """Get the user's top tracks."""
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+        try: 
+            response = requests.get(f"{self.api_base_url}/me/top/tracks", headers=headers)
+            return {
+                "items": response.json().get("items", [])
+            }
+        except Exception as e:
+            return {
+                "items": []
+            }
+        
+    
+    
+    async def get_current_user_top_artists(self, access_token: str) -> dict:
+        """Get the user's top artists."""
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+        try:
+            response = requests.get(f"{self.api_base_url}/me/top/artists", headers=headers)
+            return {
+                "items": response.json().get("items", [])
+            }
+        except Exception as e:
+            return {
+                "items": []
+            }
+        
+    async def search_tracks(self, access_token: str, search_query: str) -> dict:
+        """Search for tracks."""
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+        response = requests.get(f"{self.api_base_url}/search", headers=headers, params={"q": search_query, "type": "track"})
+        return response.json()
 
 
 

@@ -2,6 +2,7 @@ from google import genai
 import json
 from typing import Dict, Any
 from app.core.config import settings
+from app.models.preferences import Preferences
 from app.schemas.preferences import PreferencesResponse
 from app.schemas.profile import ProfileResponse
 from app.models.profile import Profile
@@ -81,6 +82,7 @@ class GeminiService:
         try:
             # Clean up potential markdown formatting from the response
             cleaned_response = response.text.strip().lstrip('```json').rstrip('```').strip()
+
             return json.loads(cleaned_response)
         except (json.JSONDecodeError, AttributeError):
             return {
@@ -90,7 +92,7 @@ class GeminiService:
                 "target_danceability": 0.7
             }
 
-    async def recommend_spotify_playlist(self,user_profile: ProfileResponse, user_preferences: PreferencesResponse):
+    async def recommend_spotify_playlist(self,user_profile: ProfileResponse, user_preferences: PreferencesResponse, workout_type: str, duration_minutes: int):
         # Fetch user's Spotify data
         # This assumes you have the user's Spotify access token stored and refreshed
         try:
@@ -102,7 +104,7 @@ class GeminiService:
             top_artists = await self.spotify_service.get_current_user_top_artists(user_preferences.spotify_data.get('access_token', ''))
             top_artist_names = [artist['name'] for artist in top_artists['items']]
 
-            seed_tracks = await self.spotify_service.get_seed_tracks(user_preferences.spotify_data.get('access_token', ''), user_preferences.music_genres)
+            # seed_tracks = await self.spotify_service.get_seed_tracks(user_preferences.spotify_data.get('access_token', ''), user_preferences.music_genres, workout_type)
 
         except (json.JSONDecodeError, AttributeError):
             return {
@@ -118,9 +120,8 @@ class GeminiService:
         - Preferred Genres: {', '.join(user_preferences.music_genres) if user_preferences.music_genres else 'None'}
         - User's Top Tracks: {', '.join(top_track_names[:5]) if top_track_names else 'None'}
         - User's Top Artists: {', '.join(top_artist_names[:5]) if top_artist_names else 'None'}
-        - Additional Seed Tracks: {', '.join(seed_tracks) if seed_tracks else 'None'}
 
-        Please suggest 10-15 songs and artists for a Spotify playlist. Provide the output in a structured JSON format.
+        Please suggest songs and artists for a Spotify playlist within the duration of {duration_minutes} minutes. Provide the output in a structured JSON format.
         The JSON should have a 'playlist_recommendations' key, which is a list of dicts.
         Each dict should have:
         - 'song_title': (string)
@@ -145,8 +146,17 @@ class GeminiService:
         """
 
         try:
-            response = await self.client.aio.models.generate_content(prompt)
-            playlist_recommendations_json = json.loads(response.text.strip('```json\n').strip('\n```'))
+            response = await self.client.aio.models.generate_content(
+            model=self.model_name,
+            contents=prompt
+        )
+            
+            
+            response_text = response.text.strip().lstrip('```json').rstrip('```').strip()
+            playlist_recommendations_json = json.loads(response_text)
+            
+            user_spotify_profile = await self.spotify_service.get_user_profile(user_preferences.spotify_data.get('access_token', ''))
+
 
             # Now, use your SpotifyClient to search for these tracks and potentially create a playlist
             recommended_tracks_uris = []
@@ -158,10 +168,10 @@ class GeminiService:
 
             if recommended_tracks_uris:
                 # Create a new playlist
-                playlist_name = f"SyncNSweat - {user_preferences.mood_or_activity} Playlist"
-                new_playlist = await self.spotify_service.create_playlist(user_preferences.spotify_data.get('access_token', ''), playlist_name, public=False)
+                playlist_name = f"SyncNSweat - {', '.join(user_preferences.music_genres)} {workout_type} Playlist"
+                new_playlist = await self.spotify_service.create_playlist(user_preferences.spotify_data.get('access_token', ''), user_spotify_profile.get('id', ''), playlist_name, public=False)
                 if new_playlist:
-                    await self.spotify_service.add_items_to_playlist(user_preferences.spotify_data.get('access_token', ''), new_playlist['id'], recommended_tracks_uris)
+                    await self.spotify_service.add_tracks_to_playlist(user_preferences.spotify_data.get('access_token', ''), new_playlist['id'], recommended_tracks_uris)
                     return {"message": "Playlist created and tracks added!", "playlist_url": new_playlist['external_urls']['spotify']}
                 else:
                     return {"message": "Could not create Spotify playlist."}
