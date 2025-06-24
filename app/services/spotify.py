@@ -2,14 +2,20 @@ import base64
 import requests
 from typing import Dict, List, Optional, Any
 from app.core.config import settings
+from sqlalchemy.orm import Session
+
+from app.models.preferences import Preferences
+from app.models.user import User
 
 class SpotifyService:
-    def __init__(self):
+    def __init__(self, db:Session, current_user: Optional[User] = None):
         self.client_id = settings.SPOTIFY_CLIENT_ID
         self.client_secret = settings.SPOTIFY_CLIENT_SECRET
         self.auth_url = "https://accounts.spotify.com/authorize"
         self.token_url = "https://accounts.spotify.com/api/token"
         self.api_base_url = "https://api.spotify.com/v1"
+        self.db = db
+        self.current_user = current_user
     
     def get_auth_url(self, redirect_uri: str, state: Optional[str] = None) -> str:
         """
@@ -62,31 +68,34 @@ class SpotifyService:
         response = requests.post(self.token_url, headers=headers, data=data)
         return response.json()
     
-    async def get_user_profile(self, access_token: str) -> Dict[str, Any]:
-        """
-        Get the user's Spotify profile.
-        """
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-        
-        response = requests.get(f"{self.api_base_url}/me", headers=headers)
+    async def get_user_profile(
+        self,
+        access_token: str,
+        refresh_token: str,
+    ) -> Dict[str, Any]:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url = f"{self.api_base_url}/me"
+        response = self._make_request_with_refresh(
+            "GET", url, headers, refresh_token
+        )
         return response.json()
-    
-    async def get_user_playlists(self, access_token: str, limit: int = 50) -> Dict[str, Any]:
+
+
+    async def get_user_playlists(self, access_token: str, refresh_token: str, limit: int = 50) -> Dict[str, Any]:
         """
         Get the user's playlists.
         """
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-        
-        response = requests.get(f"{self.api_base_url}/me/playlists?limit={limit}", headers=headers)
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url = f"{self.api_base_url}/me/playlists?limit={limit}"
+        response = self._make_request_with_refresh(
+            "GET", url, headers, refresh_token
+        )
         return response.json()
     
     async def create_playlist(
         self,
         access_token: str,
+        refresh_token: str,
         user_id: str,
         name: str,
         description: str = "",
@@ -105,10 +114,12 @@ class SpotifyService:
             "public": public
         }
         
-        response = requests.post(
+        response = self._make_request_with_refresh(
+            "POST",
             f"{self.api_base_url}/users/{user_id}/playlists",
-            headers=headers,
-            json=data
+            headers,
+            refresh_token=refresh_token,
+            data=data,
         )
         return response.json()
     
@@ -259,6 +270,44 @@ class SpotifyService:
         }
         response = requests.get(f"{self.api_base_url}/search", headers=headers, params={"q": search_query, "type": "track"})
         return response.json()
+    
+    def _default_update_access_token(self, new_access_token: str, user: Optional[User], db: Session):
+        """
+        Fallback function to update the user's access token in the database if no callback is provided.
+        """
+        if user is not None:
+            preferences = db.query(Preferences).filter(Preferences.user_id == user.id).first()
+            if preferences is not None:
+                preferences.spotifyData.access_token = new_access_token
+                db.add(preferences)
+                db.commit()
+
+    def _make_request_with_refresh(
+        self,
+        method: str,
+        url: str,
+        headers: dict,
+        refresh_token: str,
+        update_access_token_callback=None,
+        **kwargs
+    ):
+        response = requests.request(method, url, headers=headers, **kwargs)
+        if response.status_code == 401 and refresh_token:
+            # Token expired, refresh it
+            token_data = self.refresh_access_token(refresh_token)
+            new_access_token = token_data.get("access_token")
+            if not new_access_token:
+                raise Exception("Failed to refresh access token")
+            # Update the access token wherever you store it (session/db)
+            if update_access_token_callback is not None:
+                update_access_token_callback(new_access_token, self.current_user)
+            else:
+                self._default_update_access_token(new_access_token, self.current_user, self.db)
+            headers["Authorization"] = f"Bearer {new_access_token}"
+            # Retry the request
+            response = requests.request(method, url, headers=headers, **kwargs)
+        return response
+
 
 
 

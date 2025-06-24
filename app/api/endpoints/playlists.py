@@ -23,7 +23,7 @@ def get_spotify_auth_url(
     """
     Get Spotify authorization URL.
     """
-    spotify_service = SpotifyService()
+    spotify_service = SpotifyService(db)
     redirect_uri = f"{settings.SPOTIFY_REDIRECT_URL}/api/v1/auth/spotify/callback"
     auth_url = spotify_service.get_auth_url(redirect_uri, state=str(current_user.id))
 
@@ -32,7 +32,7 @@ def get_spotify_auth_url(
 
 @router.get("/spotify/recommendations")
 async def get_spotify_recommendations(
-    workout_type: str = None,
+    workout_type: str = "",
     duration_minutes: int = 60,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -71,7 +71,7 @@ async def get_spotify_recommendations(
 
 
     # Initialize SpotifyService
-    gemini_service = GeminiService()
+    gemini_service = GeminiService(db, current_user)
 
     # Get seed tracks and genres based on preferences and workout type
     # seed_tracks = spotify_service.get_seed_tracks(

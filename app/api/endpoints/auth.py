@@ -163,7 +163,7 @@ def spotify_callback(
         db.refresh(preferences)
 
     # Exchange code for access token
-    spotify_service = SpotifyService()
+    spotify_service = SpotifyService(db)
     redirect_uri = f"{settings.SPOTIFY_REDIRECT_URL}/api/v1/auth/spotify/callback"
     token_data = spotify_service.get_access_token(code, redirect_uri)
 
