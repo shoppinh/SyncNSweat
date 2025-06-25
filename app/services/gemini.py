@@ -121,7 +121,7 @@ class GeminiService:
         - User's Top Tracks: {', '.join(top_track_names[:5]) if top_track_names else 'None'}
         - User's Top Artists: {', '.join(top_artist_names[:5]) if top_artist_names else 'None'}
 
-        Please suggest songs and artists for a Spotify playlist within the duration of {duration_minutes} minutes. Provide the output in a structured JSON format.
+        Please suggest 15-20 songs and artists for a Spotify playlist to make sure it lasts within the duration of {duration_minutes} minutes. Provide the output in a structured JSON format.
         The JSON should have a 'playlist_recommendations' key, which is a list of dicts.
         Each dict should have:
         - 'song_title': (string)
