@@ -16,7 +16,9 @@ from app.core.security import (
 from app.core.config import settings
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
+from app.dependencies.spotify import get_token_manager
 from app.services.spotify import SpotifyService
+from app.services.spotify_token_manager import SpotifyTokenManager
 
 router = APIRouter()
 
@@ -102,11 +104,12 @@ def refresh_token(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/spotify/callback/")
-def spotify_callback(
+async def spotify_callback(
     code: str = Query(None, description="Spotify authorization code"),
     state: str = Query(None, description="State parameter (user ID)"),
     error: str = Query(None, description="Spotify error, if any"),
     db: Session = Depends(get_db),
+    token_manager: SpotifyTokenManager = Depends(get_token_manager),
 ):
     """
     Handle Spotify OAuth callback.
@@ -162,10 +165,10 @@ def spotify_callback(
         db.commit()
         db.refresh(preferences)
 
-    # Exchange code for access token
-    spotify_service = SpotifyService(db)
+    # Exchange code for access token using new service
+    spotify_service = SpotifyService(token_manager)
     redirect_uri = f"{settings.SPOTIFY_REDIRECT_URL}/api/v1/auth/spotify/callback"
-    token_data = spotify_service.get_access_token(code, redirect_uri)
+    token_data = await spotify_service.get_access_token(code, redirect_uri)
 
     if "error" in token_data:
         raise HTTPException(

@@ -1,26 +1,33 @@
 import base64
-import requests
-from typing import Dict, List, Optional, Any
+import asyncio
+import json
+from typing import Dict, List, Optional, Any, Callable
+import httpx
+from datetime import datetime, timedelta
 from app.core.config import settings
-from sqlalchemy.orm import Session
+from app.services.spotify_token_manager import SpotifyTokenManager
 
-from app.models.preferences import Preferences
-from app.models.user import User
 
 class SpotifyService:
-    def __init__(self, db:Session, current_user: Optional[User] = None):
+    def __init__(self, token_manager: SpotifyTokenManager):
         self.client_id = settings.SPOTIFY_CLIENT_ID
         self.client_secret = settings.SPOTIFY_CLIENT_SECRET
         self.auth_url = "https://accounts.spotify.com/authorize"
         self.token_url = "https://accounts.spotify.com/api/token"
         self.api_base_url = "https://api.spotify.com/v1"
-        self.db = db
-        self.current_user = current_user
+        self.token_manager = token_manager
+        self._client: Optional[httpx.AsyncClient] = None
+    
+    async def __aenter__(self):
+        self._client = httpx.AsyncClient(timeout=settings.SPOTIFY_REQUEST_TIMEOUT)
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self._client:
+            await self._client.aclose()
     
     def get_auth_url(self, redirect_uri: str, state: Optional[str] = None) -> str:
-        """
-        Get the Spotify authorization URL.
-        """
+        """Get the Spotify authorization URL."""
         params = {
             "client_id": self.client_id,
             "response_type": "code",
@@ -33,10 +40,8 @@ class SpotifyService:
         auth_url = f"{self.auth_url}?" + "&".join([f"{k}={v}" for k, v in params.items()])
         return auth_url
     
-    def get_access_token(self, code: str, redirect_uri: str) -> Dict[str, Any]:
-        """
-        Exchange authorization code for access token.
-        """
+    async def get_access_token(self, code: str, redirect_uri: str) -> Dict[str, Any]:
+        """Exchange authorization code for access token."""
         auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         headers = {
             "Authorization": f"Basic {auth_header}",
@@ -48,111 +53,155 @@ class SpotifyService:
             "redirect_uri": redirect_uri
         }
         
-        response = requests.post(self.token_url, headers=headers, data=data)
-        return response.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(self.token_url, headers=headers, data=data)
+            response.raise_for_status()
+            return response.json()
     
-    def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
-        """
-        Refresh an access token.
-        """
-        auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
+    async def _refresh_token(self, refresh_token: str) -> Dict[str, Any]:
+        """Refresh access token with retry logic"""
+        auth_header = base64.b64encode(
+            f"{self.client_id}:{self.client_secret}".encode()
+        ).decode()
+        
         headers = {
             "Authorization": f"Basic {auth_header}",
             "Content-Type": "application/x-www-form-urlencoded"
         }
-        data = {
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token
-        }
+        data = {"grant_type": "refresh_token", "refresh_token": refresh_token}
         
-        response = requests.post(self.token_url, headers=headers, data=data)
-        return response.json()
+        for attempt in range(settings.SPOTIFY_MAX_RETRIES):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        self.token_url, headers=headers, data=data
+                    )
+                    response.raise_for_status()
+                    return response.json()
+            except httpx.HTTPError as e:
+                if attempt == settings.SPOTIFY_MAX_RETRIES - 1:
+                    raise ValueError(f"Token refresh failed after {settings.SPOTIFY_MAX_RETRIES} attempts: {e}")
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+        
+        # This should never be reached due to the exception above, but satisfies type checker
+        raise ValueError("Token refresh failed")
     
-    async def get_user_profile(
-        self,
-        access_token: str,
+    async def _get_valid_token(self, user_id: int, refresh_token: str, 
+                              update_callback: Optional[Callable] = None) -> str:
+        """Get valid access token, refreshing if necessary"""
+        cached_token = self.token_manager.get_cached_token(user_id)
+        
+        if cached_token and not self.token_manager.is_token_expired(cached_token):
+            return cached_token['access_token']
+        
+        # Refresh token
+        token_data = await self._refresh_token(refresh_token)
+        if not token_data.get('access_token'):
+            raise ValueError("Failed to refresh access token")
+        
+        # Update database via callback
+        if update_callback:
+            await update_callback(token_data['access_token'], user_id)
+        
+        # Cache new token
+        expires_at = datetime.now() + timedelta(seconds=token_data['expires_in'])
+        token_data['expires_at'] = expires_at.isoformat()
+        self.token_manager.cache_token(user_id, token_data, token_data['expires_in'])
+        
+        return token_data['access_token']
+    
+    async def _make_authenticated_request(
+        self, 
+        method: str, 
+        endpoint: str, 
+        user_id: int, 
         refresh_token: str,
+        update_callback: Optional[Callable] = None,
+        **kwargs
     ) -> Dict[str, Any]:
-        headers = {"Authorization": f"Bearer {access_token}"}
-        url = f"{self.api_base_url}/me"
-        response = self._make_request_with_refresh(
-            "GET", url, headers, refresh_token
+        """Make authenticated request with automatic token refresh"""
+        access_token = await self._get_valid_token(user_id, refresh_token, update_callback)
+        
+        headers = kwargs.get('headers', {})
+        headers['Authorization'] = f'Bearer {access_token}'
+        kwargs['headers'] = headers
+        
+        url = f"{self.api_base_url}{endpoint}"
+        
+        for attempt in range(settings.SPOTIFY_MAX_RETRIES):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.request(method, url, **kwargs)
+                    response.raise_for_status()
+                    return response.json()
+            except httpx.HTTPError as e:
+                if attempt == settings.SPOTIFY_MAX_RETRIES - 1:
+                    raise ValueError(f"Request failed after {settings.SPOTIFY_MAX_RETRIES} attempts: {e}")
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+        
+        # This should never be reached due to the exception above, but satisfies type checker
+        raise ValueError("Request failed")
+    
+    # Public methods using the token manager
+    async def get_user_profile(self, user_id: int, refresh_token: str
+                              ) -> Dict[str, Any]:
+        """Get user profile with automatic token management"""
+        return await self._make_authenticated_request(
+            "GET", "/me", user_id, refresh_token
         )
-        return response.json()
-
-
-    async def get_user_playlists(self, access_token: str, refresh_token: str, limit: int = 50) -> Dict[str, Any]:
-        """
-        Get the user's playlists.
-        """
-        headers = {"Authorization": f"Bearer {access_token}"}
-        url = f"{self.api_base_url}/me/playlists?limit={limit}"
-        response = self._make_request_with_refresh(
-            "GET", url, headers, refresh_token
+    
+    async def get_user_playlists(self, user_id: int, refresh_token: str, 
+                                limit: int = 50) -> Dict[str, Any]:
+        """Get user playlists with automatic token management"""
+        return await self._make_authenticated_request(
+            "GET", f"/me/playlists?limit={limit}", user_id, refresh_token
         )
-        return response.json()
     
     async def create_playlist(
         self,
-        access_token: str,
+        user_id: int,
         refresh_token: str,
-        user_id: str,
+        spotify_user_id: str,
         name: str,
         description: str = "",
         public: bool = False
     ) -> Dict[str, Any]:
-        """
-        Create a new playlist.
-        """
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
+        """Create a new playlist with automatic token management"""
         data = {
             "name": name,
             "description": description,
             "public": public
         }
         
-        response = self._make_request_with_refresh(
+        return await self._make_authenticated_request(
             "POST",
-            f"{self.api_base_url}/users/{user_id}/playlists",
-            headers,
-            refresh_token=refresh_token,
-            data=data,
+            f"/users/{spotify_user_id}/playlists",
+            user_id,
+            refresh_token,
+            json=data,
         )
-        return response.json()
     
     async def add_tracks_to_playlist(
         self,
-        access_token: str,
+        user_id: int,
+        refresh_token: str,
         playlist_id: str,
         track_uris: List[str]
     ) -> Dict[str, Any]:
-        """
-        Add tracks to a playlist.
-        """
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "uris": track_uris
-        }
+        """Add tracks to a playlist with automatic token management"""
+        data = {"uris": track_uris}
         
-        response = requests.post(
-            f"{self.api_base_url}/playlists/{playlist_id}/tracks",
-            headers=headers,
-            json=data
+        return await self._make_authenticated_request(
+            "POST",
+            f"/playlists/{playlist_id}/tracks",
+            user_id,
+            refresh_token,
+            json=data,
         )
-        return response.json()
     
-    async def get_seed_tracks(self, access_token: str, genres: list, workout_type: str) -> list:
-        """Get seed tracks based on genres and workout type."""
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-        
+    async def get_seed_tracks(self, user_id: int, refresh_token: str, 
+                              genres: list, workout_type: str) -> list:
+        """Get seed tracks based on genres and workout type with automatic token management"""
         # Map workout types to appropriate genres
         workout_genres = {
             "cardio": ["electronic", "dance", "pop"],
@@ -172,39 +221,65 @@ class SpotifyService:
             "limit": 2  # Get 2 tracks to use as seeds
         }
         
-        response = requests.get(
-            f"{self.api_base_url}/recommendations",
-            headers=headers,
+        response = await self._make_authenticated_request(
+            "GET",
+            "/recommendations",
+            user_id,
+            refresh_token,
             params=params
         )
         
-        if response.status_code != 200:
-            raise Exception(f"Failed to get seed tracks: {response.json()}")
-            
-        tracks = response.json().get("tracks", [])
+        tracks = response.get("tracks", [])
         return [track["id"] for track in tracks]
 
-
-    def create_workout_playlist(self, access_token: str, track_uris: list, 
-                              workout_type: str, user_id: str) -> dict:
-        """Create a new playlist with the recommended tracks."""
-        # Get user profile for display name
-        user_profile = self.get_user_profile(access_token)
-        display_name = user_profile.get("display_name", "User")
+    async def get_current_user_top_tracks(self, user_id: int, refresh_token: str
+                                         ) -> dict:
+        """Get the user's top tracks with automatic token management"""
+        try:
+            response = await self._make_authenticated_request(
+                "GET", "/me/top/tracks", user_id, refresh_token
+            )
+            return {"items": response.get("items", [])}
+        except Exception as e:
+            return {"items": []}
+    
+    async def get_current_user_top_artists(self, user_id: int, refresh_token: str
+                                          ) -> dict:
+        """Get the user's top artists with automatic token management"""
+        try:
+            response = await self._make_authenticated_request(
+                "GET", "/me/top/artists", user_id, refresh_token
+            )
+            return {"items": response.get("items", [])}
+        except Exception as e:
+            return {"items": []}
         
+    async def search_tracks(self, user_id: int, refresh_token: str, 
+                           search_query: str) -> dict:
+        """Search for tracks with automatic token management"""
+        return await self._make_authenticated_request(
+            "GET", "/search", user_id, refresh_token,
+            params={"q": search_query, "type": "track"}
+        )
+    
+    async def create_workout_playlist(self, user_id: int, refresh_token: str, 
+                                     track_uris: list, 
+                                     workout_type: str, spotify_user_id: str) -> dict:
+        """Create a new playlist with the recommended tracks with automatic token management"""
         # Create playlist name and description
         workout_names = {
             "cardio": "Cardio Boost",
             "strength": "Power Mix",
             "yoga": "Zen Flow",
         }
-        playlist_name = f"{workout_names.get(workout_type, 'Workout')} for {display_name}"
+        playlist_name = f"{workout_names.get(workout_type, 'Workout')} Playlist"
         description = f"Custom {workout_type.title()} workout playlist created by SyncNSweat"
         
         # Create the playlist
-        playlist = self.create_playlist(
-            access_token=access_token,
+        playlist = await self.create_playlist(
             user_id=user_id,
+            refresh_token=refresh_token,
+            spotify_user_id=spotify_user_id,
             name=playlist_name,
             description=description,
             public=False  # Keep private by default
@@ -214,8 +289,9 @@ class SpotifyService:
             raise Exception(f"Failed to create playlist: {playlist}")
         
         # Add tracks to the playlist
-        result = self.add_tracks_to_playlist(
-            access_token=access_token,
+        result = await self.add_tracks_to_playlist(
+            user_id=user_id,
+            refresh_token=refresh_token,
             playlist_id=playlist["id"],
             track_uris=track_uris
         )
@@ -230,83 +306,6 @@ class SpotifyService:
             "external_url": playlist["external_urls"]["spotify"],
             "image_url": playlist["images"][0]["url"] if playlist.get("images") else None,
         }
-
-    async def get_current_user_top_tracks(self, access_token: str) -> dict:
-        """Get the user's top tracks."""
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-        try: 
-            response = requests.get(f"{self.api_base_url}/me/top/tracks", headers=headers)
-            return {
-                "items": response.json().get("items", [])
-            }
-        except Exception as e:
-            return {
-                "items": []
-            }
-        
-    
-    
-    async def get_current_user_top_artists(self, access_token: str) -> dict:
-        """Get the user's top artists."""
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-        try:
-            response = requests.get(f"{self.api_base_url}/me/top/artists", headers=headers)
-            return {
-                "items": response.json().get("items", [])
-            }
-        except Exception as e:
-            return {
-                "items": []
-            }
-        
-    async def search_tracks(self, access_token: str, search_query: str) -> dict:
-        """Search for tracks."""
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-        response = requests.get(f"{self.api_base_url}/search", headers=headers, params={"q": search_query, "type": "track"})
-        return response.json()
-    
-    def _default_update_access_token(self, new_access_token: str, user: Optional[User], db: Session):
-        """
-        Fallback function to update the user's access token in the database if no callback is provided.
-        """
-        if user is not None:
-            preferences = db.query(Preferences).filter(Preferences.user_id == user.id).first()
-            if preferences is not None:
-                preferences.spotifyData.access_token = new_access_token
-                db.add(preferences)
-                db.commit()
-
-    def _make_request_with_refresh(
-        self,
-        method: str,
-        url: str,
-        headers: dict,
-        refresh_token: str,
-        update_access_token_callback=None,
-        **kwargs
-    ):
-        response = requests.request(method, url, headers=headers, **kwargs)
-        if response.status_code == 401 and refresh_token:
-            # Token expired, refresh it
-            token_data = self.refresh_access_token(refresh_token)
-            new_access_token = token_data.get("access_token")
-            if not new_access_token:
-                raise Exception("Failed to refresh access token")
-            # Update the access token wherever you store it (session/db)
-            if update_access_token_callback is not None:
-                update_access_token_callback(new_access_token, self.current_user)
-            else:
-                self._default_update_access_token(new_access_token, self.current_user, self.db)
-            headers["Authorization"] = f"Bearer {new_access_token}"
-            # Retry the request
-            response = requests.request(method, url, headers=headers, **kwargs)
-        return response
 
 
 

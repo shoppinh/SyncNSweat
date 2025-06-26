@@ -1,43 +1,38 @@
-from google import genai
 import json
-from typing import Dict, Any, Optional, List, cast
+import os
+from typing import Dict, List, Any, Optional, cast, Callable
+from google import genai
 from app.core.config import settings
-from app.models.preferences import Preferences
-from app.models.user import User
-from app.schemas.preferences import PreferencesResponse
-from app.schemas.profile import ProfileResponse
-from app.models.profile import Profile
 from app.services.spotify import SpotifyService
-from app.services.user import UserService
-from sqlalchemy.orm import Session
+from app.schemas.profile import ProfileResponse
+from app.schemas.preferences import PreferencesResponse
 
-_JSON_BLOCK_START = '```json'
-_JSON_BLOCK_END = '```'
+_JSON_BLOCK_START = "```json"
+_JSON_BLOCK_END = "```"
 
 class GeminiService:
-    def __init__(self, db: Session, current_user: Optional[User] = None):
+    def __init__(self, spotify_service: SpotifyService):
         """
         Initializes the Gemini Service client using the API key from settings.
         """
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         self.model_name = 'gemini-2.5-flash'
-        self.spotify_service = SpotifyService(db, current_user=current_user)
-        self.user_service = UserService(db)
+        self.spotify_service = spotify_service
 
-    async def get_workout_recommendations(self, user_profile: Profile, user_preferences: Preferences, workout_type: str) -> Dict[str, Any]:
+    async def get_workout_recommendations(self, user_profile: Dict[str, Any], user_preferences: Dict[str, Any], workout_type: str) -> Dict[str, Any]:
         """
         Generate personalized workout recommendations using the Gemini AI model asynchronously.
         """
         prompt = f"""
         As a fitness expert, create a personalized {workout_type} workout plan for:
-        - Fitness level: {user_profile.fitness_level if user_profile.fitness_level else 'beginner'}
-        - Fitness goal: {user_profile.fitness_goal if user_profile.fitness_goal else 'general_fitness'}
-        - Available days: {user_profile.available_days if user_profile.available_days else ['Monday', 'Wednesday', 'Friday']}
-        - Workout duration: {user_profile.workout_duration_minutes if user_profile.workout_duration_minutes else 45}
+        - Fitness level: {user_profile.get('fitness_level', 'beginner')}
+        - Fitness goal: {user_profile.get('fitness_goal', 'general_fitness')}
+        - Available days: {user_profile.get('available_days', ['Monday', 'Wednesday', 'Friday'])}
+        - Workout duration: {user_profile.get('workout_duration_minutes', 45)}
         - Preferences:
-         + Available equipment: {user_preferences.available_equipment if user_preferences.available_equipment else ['dumbbells', 'resistance bands']}
-         + Target muscle groups: {user_preferences.target_muscle_groups if user_preferences.target_muscle_groups else []}
-         + Exercise types: {user_preferences.exercise_types if user_preferences.exercise_types else ['strength', 'cardio']}
+         + Available equipment: {user_preferences.get('available_equipment', ['dumbbells', 'resistance bands'])}
+         + Target muscle groups: {user_preferences.get('target_muscle_groups', [])}
+         + Exercise types: {user_preferences.get('exercise_types', ['strength', 'cardio'])}
 
         Format the response as a valid JSON object with the following keys:
         - "exercises": a list of exercise objects, each with "name", "sets", "reps", "machine" and "rest" in minutes.
@@ -109,23 +104,43 @@ class GeminiService:
                 "target_danceability": 0.7
             }
 
-    async def recommend_spotify_playlist(self, user_profile: ProfileResponse, user_preferences: PreferencesResponse, workout_type: str, duration_minutes: int) -> Dict[str, Any]:
+    async def recommend_spotify_playlist(
+        self, 
+        user_id: int,
+        refresh_token: str,
+        user_profile: Dict[str, Any],
+        user_preferences: Dict[str, Any],
+        workout_type: str, 
+        duration_minutes: int
+    ) -> Dict[str, Any]:
+        """
+        Recommend Spotify playlist based on user preferences and workout type.
+        Pure business logic - no database or user context dependencies.
+        """
+        if not self.spotify_service:
+            return {
+                "message": "Spotify service not available. Please ensure your Spotify account is connected.",
+                "playlist_recommendations": [],
+                "playlist_url": None
+            }
+
         # Fetch user's Spotify data
         try:
-            spotify_data: Dict[str, Any] = {}
-            if hasattr(user_preferences, 'spotify_data') and user_preferences.spotify_data is not None:
-                spotify_data = cast(Dict[str, Any], user_preferences.spotify_data)
-            access_token = spotify_data.get('access_token', '')
-            refresh_token = spotify_data.get('refresh_token', '')
-            top_tracks_raw = await self.spotify_service.get_current_user_top_tracks(access_token)
+            # Get user's top tracks and artists using the new service
+            top_tracks_raw = await self.spotify_service.get_current_user_top_tracks(
+                user_id, refresh_token
+            )
             top_tracks_items = top_tracks_raw.get('items', []) if isinstance(top_tracks_raw, dict) else []
             top_track_names: List[str] = [str(track.get('name', '')) for track in top_tracks_items if isinstance(track, dict) and 'name' in track]
-            top_artists_raw = await self.spotify_service.get_current_user_top_artists(access_token)
+            
+            top_artists_raw = await self.spotify_service.get_current_user_top_artists(
+                user_id, refresh_token
+            )
             top_artists_items = top_artists_raw.get('items', []) if isinstance(top_artists_raw, dict) else []
             top_artist_names: List[str] = [str(artist.get('name', '')) for artist in top_artists_items if isinstance(artist, dict) and 'name' in artist]
-        except Exception:
+        except Exception as e:
             return {
-                "message": "Error fetching Spotify data. Please ensure your Spotify account is connected and try again.",
+                "message": f"Error fetching Spotify data: {str(e)}. Please ensure your Spotify account is connected and try again.",
                 "playlist_recommendations": [],
                 "playlist_url": None
             }
@@ -133,8 +148,8 @@ class GeminiService:
         prompt = f"""
         You are a music curator. Your goal is to recommend a Spotify playlist based on the user's preferences.
         Here's the user's information:
-        - User ID: {getattr(user_profile, 'id', 'unknown')}
-        - Preferred Genres: {', '.join(getattr(user_preferences, 'music_genres', [])) if getattr(user_preferences, 'music_genres', None) else 'None'}
+        - User ID: {user_profile.get('id', 'unknown')}
+        - Preferred Genres: {', '.join(user_preferences.get('music_genres', [])) if user_preferences.get('music_genres') else 'None'}
         - User's Top Tracks: {', '.join(top_track_names[:5]) if top_track_names else 'None'}
         - User's Top Artists: {', '.join(top_artist_names[:5]) if top_artist_names else 'None'}
 
@@ -171,46 +186,59 @@ class GeminiService:
                 raise ValueError('No response text from Gemini')
             response_text = text.strip().lstrip(_JSON_BLOCK_START).rstrip(_JSON_BLOCK_END).strip()
             playlist_recommendations_json = json.loads(response_text)
-            refresh_token = spotify_data.get('refresh_token', '')
+            
+            # Get user's Spotify profile
             user_spotify_profile = await self.spotify_service.get_user_profile(
-                access_token,
-                refresh_token,
-                self.user_service.update_access_token
+                user_id, refresh_token
             )
+            
             recommended_tracks_uris: List[str] = []
             for rec in playlist_recommendations_json.get('playlist_recommendations', []):
                 if not (isinstance(rec, dict) and 'song_title' in rec and 'artist_name' in rec):
                     continue
                 search_query = f"track:{rec['song_title']} artist:{rec['artist_name']}"
-                search_results = await self.spotify_service.search_tracks(access_token, search_query)
+                search_results = await self.spotify_service.search_tracks(
+                    user_id, refresh_token, search_query
+                )
                 if search_results and isinstance(search_results, dict):
                     tracks = search_results.get('tracks', {})
                     items = tracks.get('items', []) if isinstance(tracks, dict) else []
                     if items and isinstance(items[0], dict) and 'uri' in items[0]:
                         recommended_tracks_uris.append(items[0]['uri'])
+            
             if recommended_tracks_uris:
-                playlist_name = f"SyncNSweat - {', '.join(getattr(user_preferences, 'music_genres', []))} {workout_type} Playlist"
+                playlist_name = f"SyncNSweat - {', '.join(user_preferences.get('music_genres', []))} {workout_type} Playlist"
+                spotify_user_id = user_spotify_profile.get('id', '') if isinstance(user_spotify_profile, dict) else ''
+                
                 new_playlist = await self.spotify_service.create_playlist(
-                    access_token,
+                    user_id,
                     refresh_token,
-                    user_spotify_profile.get('id', '') if isinstance(user_spotify_profile, dict) else '',
+                    spotify_user_id,
                     playlist_name,
                     public=False
                 )
-                if new_playlist and isinstance(new_playlist, dict) and 'id' in new_playlist and 'external_urls' in new_playlist and 'spotify' in new_playlist['external_urls']:
+                
+                if new_playlist and isinstance(new_playlist, dict) and 'id' in new_playlist:
                     await self.spotify_service.add_tracks_to_playlist(
-                        access_token,
+                        user_id,
+                        refresh_token,
                         new_playlist['id'],
                         recommended_tracks_uris
                     )
-                    return {"message": "Playlist created and tracks added!", "playlist_url": new_playlist['external_urls']['spotify']}
+                    
+                    external_url = new_playlist.get('external_urls', {}).get('spotify', '')
+                    return {
+                        "message": "Playlist created and tracks added!", 
+                        "playlist_url": external_url,
+                        "playlist_recommendations": playlist_recommendations_json.get('playlist_recommendations', [])
+                    }
                 else:
                     return {"message": "Could not create Spotify playlist."}
             else:
                 return {"message": "No tracks found for the recommendations."}
-        except Exception:
+        except Exception as e:
             return {
-                "message": "Error processing playlist recommendations. Please try again.",
+                "message": f"Error processing playlist recommendations: {str(e)}. Please try again.",
                 "playlist_recommendations": [],
                 "playlist_url": None
             }

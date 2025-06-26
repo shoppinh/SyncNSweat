@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
-from typing import List
+from typing import List, Optional, cast
 from datetime import datetime, timedelta
 
 from app.db.session import get_db
+from app.dependencies.spotify import get_spotify_service
 from app.models.user import User
 from app.models.profile import Profile
 from app.models.preferences import Preferences
@@ -15,6 +16,8 @@ from app.core.security import get_current_user
 from app.services.scheduler import SchedulerService
 from app.services.exercise_selector import ExerciseSelectorService
 from app.services.gemini import GeminiService
+from app.services.spotify import SpotifyService
+from app.services.spotify_token_manager import SpotifyTokenManager
 
 # Define constants for error messages
 WORKOUT_NOT_FOUND = "Workout not found"
@@ -29,8 +32,8 @@ router = APIRouter()
 def read_workouts(
     skip: int = 0,
     limit: int = 100,
-    start_date: datetime = None,
-    end_date: datetime = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -71,10 +74,10 @@ def create_random_workout(
     exercise_selector = ExerciseSelectorService(db)
     
     workout_exercises = exercise_selector.select_exercises_for_workout(
-        focus=suggest_in.focus,
-        fitness_level=suggest_in.fitness_level,
-        available_equipment=suggest_in.available_equipment,
-        workout_duration_minutes=suggest_in.duration_minutes
+        focus=cast(str, suggest_in.focus),
+        fitness_level=cast(str, suggest_in.fitness_level),
+        available_equipment=cast(List[str], suggest_in.available_equipment),
+        workout_duration_minutes=cast(int, suggest_in.duration_minutes)
     )
     
     exercises_to_add = [
@@ -380,7 +383,7 @@ def delete_workout_exercise(
 
 @router.post("/schedule", response_model=ScheduleResponse)
 def generate_workout_schedule(
-    schedule_request: ScheduleRequest = None,
+    schedule_request: Optional[ScheduleRequest] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -420,7 +423,7 @@ def generate_workout_schedule(
     if existing_workouts and not regenerate:
         # Return existing workouts
         return ScheduleResponse(
-            workouts=existing_workouts,
+            workouts=cast(List[WorkoutResponse], existing_workouts),
             message="Returning existing workout schedule"
         )
 
@@ -431,15 +434,15 @@ def generate_workout_schedule(
         db.commit()
 
     # Generate new workout schedule
-    scheduler_service = SchedulerService()
+    scheduler_service = SchedulerService(db)
     workouts_data = scheduler_service.generate_weekly_schedule(
-        user_id=current_user.id,
-        available_days=profile.available_days,
-        fitness_goal=profile.fitness_goal.value,
-        fitness_level=profile.fitness_level.value,
-        available_equipment=preferences.available_equipment,
-        target_muscle_groups=preferences.target_muscle_groups,
-        workout_duration_minutes=profile.workout_duration_minutes
+        user_id=cast(int, current_user.id),
+        available_days=cast(List[str], profile.available_days),
+        fitness_goal=cast(str, profile.fitness_goal.value),
+        fitness_level=cast(str, profile.fitness_level.value),
+        available_equipment=cast(List[str], preferences.available_equipment),
+        target_muscle_groups=cast(List[str], preferences.target_muscle_groups),
+        workout_duration_minutes=cast(int, profile.workout_duration_minutes)
     )
 
     # Create workouts in the database
@@ -530,12 +533,12 @@ def swap_workout_exercise(
     # Use the exercise selector service to find a replacement
     exercise_selector = ExerciseSelectorService(db)
     new_exercise_data = exercise_selector.swap_exercise(
-        exercise_id=exercise.exercise_id,
-        muscle_group=exercise.muscle_group,
-        equipment=exercise.equipment,
-        fitness_level=profile.fitness_level.value,
-        available_equipment=preferences.available_equipment,
-        recently_used_exercises=recently_used_exercises
+        exercise_id=cast(int, exercise.exercise_id),
+        muscle_group=cast(str, exercise.muscle_group),
+        equipment=cast(str, exercise.equipment),
+        fitness_level=cast(str, profile.fitness_level),
+        available_equipment=cast(List[str], preferences.available_equipment),
+        recently_used_exercises=cast(List[int], recently_used_exercises)
     )
 
     # Update the exercise with the new data
@@ -547,8 +550,8 @@ def swap_workout_exercise(
     exercise.sets = new_exercise_data["sets"]
     exercise.reps = new_exercise_data["reps"]
     exercise.rest_seconds = new_exercise_data["rest_seconds"]
-    exercise.completed_sets = 0
-    exercise.weights_used = []
+    setattr(exercise, 'completed_sets', 0)
+    setattr(exercise, 'weights_used', [])
 
     db.add(exercise)
     db.commit()
@@ -561,9 +564,10 @@ async def get_ai_workout_recommendations(
     workout_type: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    gemini_service: GeminiService = Depends(lambda: GeminiService())
+    spotify_service: SpotifyService = Depends(get_spotify_service),
 ):
     """Get AI-enhanced workout recommendations."""
+    gemini_service = GeminiService(spotify_service)
     # we can get user profile based on current_user
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
     if not profile:

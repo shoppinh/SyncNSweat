@@ -31,5 +31,13 @@ class Settings(BaseSettings):
     # Google Gemini settings
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY")
 
+    # Redis settings for token caching
+    REDIS_URL: str = os.getenv("REDIS_URL") or "redis://localhost:6379"
+    
+    # Spotify token settings
+    SPOTIFY_TOKEN_CACHE_TTL: int = 3300  # 55 minutes (5 min buffer)
+    SPOTIFY_REQUEST_TIMEOUT: int = 30
+    SPOTIFY_MAX_RETRIES: int = 3
+
 
 settings = Settings()

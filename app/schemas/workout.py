@@ -1,7 +1,9 @@
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from app.schemas.exercise import WorkoutExerciseCreate, WorkoutExerciseResponse
+
+from pydantic.alias_generators import to_camel
+from app.schemas.exercise import ExerciseResponse, WorkoutExerciseCreate
 
 class WorkoutBase(BaseModel):
     date: Optional[datetime] = None
@@ -12,7 +14,7 @@ class WorkoutBase(BaseModel):
     completed: Optional[bool] = False
 
 class WorkoutCreate(WorkoutBase):
-    date: datetime
+    date: Optional[datetime] = None
     exercises: Optional[List[WorkoutExerciseCreate]] = None
     
 class WorkoutSuggest(WorkoutBase):
@@ -22,14 +24,30 @@ class WorkoutSuggest(WorkoutBase):
 class WorkoutUpdate(WorkoutBase):
     pass
 
+
+
 class WorkoutResponse(WorkoutBase):
     id: int
     user_id: int
     created_at: datetime
-    workout_exercises: List[WorkoutExerciseResponse] = []
+    workout_exercises: List[ExerciseResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
-
+class WorkoutExerciseResponse(BaseModel):
+    exercise_id: int
+    workout_id: int
+    sets: int
+    reps: int
+    rest_seconds: int
+    order: int
+    
+    completed_sets: int
+    weights_used: List[str]
+    workout: WorkoutResponse
+    exercise: ExerciseResponse
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True,from_attributes=True)
+    
 class ScheduleRequest(BaseModel):
     """Request model for generating a workout schedule."""
     regenerate: Optional[bool] = False
@@ -49,3 +67,4 @@ class UserProfile(BaseModel):
 class WorkoutAIResponse(BaseModel):
     workout_plan: Dict[str, Any]
     message: str
+
